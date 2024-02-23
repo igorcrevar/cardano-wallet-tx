@@ -2,135 +2,92 @@ package helper
 
 import "github.com/igorcrevar/cardano-wallet-tx/core"
 
-func SendTx(
+func PrepareSignedTx(
+	txDataRetriever core.ITxDataRetriever,
 	wallet *core.Wallet,
 	testNetMagic uint,
-	socketPath string,
 	outputs []core.TxOutput,
-	metadata []byte) (string, error) {
-	txDataRetriever, err := core.NewTxDataRetriever(testNetMagic, socketPath)
-	if err != nil {
-		return "", err
-	}
-
-	defer txDataRetriever.Dispose()
-
-	protocolParams, err := txDataRetriever.GetProtocolParameters()
-	if err != nil {
-		return "", err
-	}
-
-	slot, err := txDataRetriever.GetSlot()
-	if err != nil {
-		return "", err
-	}
-
-	utxos, err := txDataRetriever.GetUtxos(wallet.GetAddress())
-	if err != nil {
-		return "", err
-	}
-
+	metadata []byte) ([]byte, string, error) {
 	builder, err := core.NewTxBuilder()
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
 
 	defer builder.Dispose()
 
-	txRaw, hash, err := builder.BuildWithDto(core.TransactionDTO{
-		FromAddress:       wallet.GetAddress(),
-		TestNetMagic:      testNetMagic,
-		Outputs:           outputs,
-		SlotNumber:        slot,
-		Utxos:             utxos,
-		ProtocolParamters: protocolParams,
-		MetaData:          metadata,
-		PotentialFee:      200_000,
-	})
+	dto, err := core.NewTransactionDTO(txDataRetriever, wallet.GetAddress())
 	if err != nil {
-		return "", err
+		return nil, "", err
+	}
+
+	dto.TestNetMagic = testNetMagic
+	dto.Outputs = outputs
+	dto.MetaData = metadata
+	dto.PotentialFee = 200_000
+
+	txRaw, hash, err := builder.BuildWithDTO(dto)
+	if err != nil {
+		return nil, "", err
 	}
 
 	txSigned, err := builder.Sign(txRaw, wallet.GetSigningKeyPath())
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
 
-	return hash, txDataRetriever.SubmitTx(txSigned)
+	return txSigned, hash, nil
 }
 
-func SendMultiSigTx(
+func PrepareMultiSigTx(txDataRetriever core.ITxDataRetriever,
 	multisigAddr *core.MultisigAddress,
-	wallets []*core.Wallet,
 	testNetMagic uint,
-	socketPath string,
 	outputs []core.TxOutput,
-	metadata []byte) (string, error) {
-	txDataRetriever, err := core.NewTxDataRetriever(testNetMagic, socketPath)
-	if err != nil {
-		return "", err
-	}
-
-	defer txDataRetriever.Dispose()
-
-	protocolParams, err := txDataRetriever.GetProtocolParameters()
-	if err != nil {
-		return "", err
-	}
-
-	slot, err := txDataRetriever.GetSlot()
-	if err != nil {
-		return "", err
-	}
-
-	utxos, err := txDataRetriever.GetUtxos(multisigAddr.GetAddress())
-	if err != nil {
-		return "", err
-	}
-
+	metadata []byte) ([]byte, string, error) {
 	builder, err := core.NewTxBuilder()
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
 
 	defer builder.Dispose()
 
 	policy, err := multisigAddr.GetPolicyScript()
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
 
-	txRaw, hash, err := builder.BuildWithDto(core.TransactionDTO{
-		FromAddress:       multisigAddr.GetAddress(),
-		TestNetMagic:      testNetMagic,
-		Outputs:           outputs,
-		SlotNumber:        slot,
-		Utxos:             utxos,
-		ProtocolParamters: protocolParams,
-		MetaData:          metadata,
-		Policy:            policy,
-		WitnessCount:      multisigAddr.GetCount(),
-		PotentialFee:      200_000,
-	})
+	dto, err := core.NewTransactionDTO(txDataRetriever, multisigAddr.GetAddress())
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
+
+	dto.TestNetMagic = testNetMagic
+	dto.Outputs = outputs
+	dto.MetaData = metadata
+	dto.Policy = policy
+	dto.WitnessCount = multisigAddr.GetCount()
+	dto.PotentialFee = 200_000
+
+	return builder.BuildWithDTO(dto)
+}
+
+func AssemblyAllWitnesses(txRaw []byte, wallets []*core.Wallet) ([]byte, error) {
+	builder, err := core.NewTxBuilder()
+	if err != nil {
+		return nil, err
+	}
+
+	defer builder.Dispose()
 
 	witnesses := make([][]byte, len(wallets))
 
 	for i, x := range wallets {
 		witness, err := builder.AddWitness(txRaw, x.GetSigningKeyPath())
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
 		witnesses[i] = witness
 	}
 
-	txSigned, err := builder.AssembleWitnesses(txRaw, witnesses)
-	if err != nil {
-		return "", err
-	}
-
-	return hash, txDataRetriever.SubmitTx(txSigned)
+	return builder.AssembleWitnesses(txRaw, witnesses)
 }

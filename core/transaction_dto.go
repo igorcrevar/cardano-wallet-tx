@@ -11,7 +11,7 @@ type TransactionDTO struct {
 	Outputs             []TxOutput
 	SlotNumber          uint64
 	Utxos               []Utxo
-	ProtocolParamters   []byte
+	ProtocolParameters  []byte
 	MetaData            []byte
 	Policy              []byte
 	WitnessCount        int
@@ -19,7 +19,31 @@ type TransactionDTO struct {
 	GetUTXOsForAmountFN func(utxos []Utxo, receiversSum uint64, potentialFee uint64) ([]TxInput, uint64, error)
 }
 
-func (b TxBuilder) BuildWithDto(dto TransactionDTO) ([]byte, string, error) {
+func NewTransactionDTO(retriever ITxDataRetriever, addr string) (TransactionDTO, error) {
+	protocolParams, err := retriever.GetProtocolParameters()
+	if err != nil {
+		return TransactionDTO{}, err
+	}
+
+	slot, err := retriever.GetSlot()
+	if err != nil {
+		return TransactionDTO{}, err
+	}
+
+	utxos, err := retriever.GetUtxos(addr)
+	if err != nil {
+		return TransactionDTO{}, err
+	}
+
+	return TransactionDTO{
+		Utxos:              utxos,
+		SlotNumber:         slot,
+		ProtocolParameters: protocolParams,
+		FromAddress:        addr,
+	}, nil
+}
+
+func (b TxBuilder) BuildWithDTO(dto TransactionDTO) ([]byte, string, error) {
 	receiversSum := uint64(0)
 	for _, x := range dto.Outputs {
 		receiversSum += x.Amount
@@ -36,7 +60,7 @@ func (b TxBuilder) BuildWithDto(dto TransactionDTO) ([]byte, string, error) {
 	}
 
 	b.SetTestNetMagic(dto.TestNetMagic).SetPolicy(dto.Policy, dto.WitnessCount).SetMetaData(dto.MetaData)
-	b.SetProtocolParameters(dto.ProtocolParamters).SetTimeToLive(dto.SlotNumber + 200)
+	b.SetProtocolParameters(dto.ProtocolParameters).SetTimeToLive(dto.SlotNumber + 200)
 	b.AddInputs(inputs...).AddOutputs(dto.Outputs...).AddOutputs(TxOutput{
 		Addr: dto.FromAddress,
 	})

@@ -27,30 +27,30 @@ type LedgerTip struct {
 	SyncProgress    string `json:"syncProgress"`
 }
 
-type TxDataRetriever struct {
+type TxDataRetrieverCli struct {
 	baseDirectory string
 	testNetMagic  uint
 	socketPath    string
 }
 
-func NewTxDataRetriever(testNetMagic uint, socketPath string) (*TxDataRetriever, error) {
+func NewTxDataRetrieverCli(testNetMagic uint, socketPath string) (*TxDataRetrieverCli, error) {
 	baseDirectory, err := os.MkdirTemp("", "cardano-txs")
 	if err != nil {
 		return nil, err
 	}
 
-	return &TxDataRetriever{
+	return &TxDataRetrieverCli{
 		baseDirectory: baseDirectory,
 		testNetMagic:  testNetMagic,
 		socketPath:    socketPath,
 	}, nil
 }
 
-func (b *TxDataRetriever) Dispose() {
+func (b *TxDataRetrieverCli) Dispose() {
 	os.RemoveAll(b.baseDirectory)
 }
 
-func (b *TxDataRetriever) GetProtocolParameters() ([]byte, error) {
+func (b *TxDataRetrieverCli) GetProtocolParameters() ([]byte, error) {
 	outFile := path.Join(b.baseDirectory, "protocol.json")
 
 	args := append([]string{
@@ -74,7 +74,7 @@ func (b *TxDataRetriever) GetProtocolParameters() ([]byte, error) {
 	return bytes, nil
 }
 
-func (b *TxDataRetriever) GetUtxos(addr string) ([]Utxo, error) {
+func (b *TxDataRetrieverCli) GetUtxos(addr string) ([]Utxo, error) {
 	args := append([]string{
 		"query", "utxo",
 		"--socket-path", b.socketPath,
@@ -128,7 +128,7 @@ func (b *TxDataRetriever) GetUtxos(addr string) ([]Utxo, error) {
 	return inputs, nil
 }
 
-func (b *TxDataRetriever) GetSlot() (uint64, error) {
+func (b *TxDataRetrieverCli) GetSlot() (uint64, error) {
 	args := append([]string{
 		"query", "tip",
 		"--socket-path", b.socketPath,
@@ -148,7 +148,7 @@ func (b *TxDataRetriever) GetSlot() (uint64, error) {
 	return legder.Slot, nil
 }
 
-func (b *TxDataRetriever) SubmitTx(tx []byte) error {
+func (b *TxDataRetrieverCli) SubmitTx(tx []byte) error {
 	txFilePath := path.Join(b.baseDirectory, "tx.send")
 
 	if err := os.WriteFile(txFilePath, tx, 0755); err != nil {

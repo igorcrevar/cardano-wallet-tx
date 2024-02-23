@@ -16,59 +16,47 @@ const (
 	testNetMagic = uint(2) //1097911063
 )
 
-func sendTx() error {
+func createTx(dataRetriever cardanowallet.ITxDataRetriever) ([]byte, string, error) {
 	currentUser, err := user.Current()
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 
 	wallet := cardanowallet.NewWallet(path.Join(currentUser.HomeDir, "cardano_wallet"), testNetMagic)
 
 	err = wallet.Create(false)
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 
 	err = wallet.Load()
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 
-	fmt.Println(wallet.GetAddress())
-	fmt.Println(wallet.GetSigningKey())
-	fmt.Println(wallet.GetVerificationKey())
-	fmt.Println(wallet.GetKeyHash())
+	fmt.Println("Address =", wallet.GetAddress())
 
 	metadata, err := json.Marshal(map[string]interface{}{
 		"0": map[string]interface{}{
-			"who":    "pera",
-			"what":   "taba-kera",
-			"health": 20,
+			"type": "single",
 		},
 	})
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 
-	hash, err := cardanowallethelper.SendTx(wallet, testNetMagic, socketPath, []cardanowallet.TxOutput{
+	return cardanowallethelper.PrepareSignedTx(dataRetriever, wallet, testNetMagic, []cardanowallet.TxOutput{
 		{
 			Addr:   "addr_test1vqjysa7p4mhu0l25qknwznvj0kghtr29ud7zp732ezwtzec0w8g3u",
 			Amount: cardanowallet.MinUtxoValue,
 		},
 	}, metadata)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("transaction has been submitted", hash)
-
-	return nil
 }
 
-func sendMultiSigTx(cnt int, atLeast int) error {
+func createMultiSigTx(dataRetriever cardanowallet.ITxDataRetriever, cnt int, atLeast int) ([]byte, string, error) {
 	currentUser, err := user.Current()
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 
 	wallets := make([]*cardanowallet.Wallet, cnt)
@@ -78,12 +66,12 @@ func sendMultiSigTx(cnt int, atLeast int) error {
 
 		err := wallets[i].Create(false)
 		if err != nil {
-			return err
+			return nil, "", err
 		}
 
 		err = wallets[i].Load()
 		if err != nil {
-			return err
+			return nil, "", err
 		}
 	}
 
@@ -95,35 +83,47 @@ func sendMultiSigTx(cnt int, atLeast int) error {
 	multisigAddr := cardanowallet.NewMultiSigAddress(path.Join(currentUser.HomeDir, "cardano_multisig"), keyHashes, testNetMagic, atLeast)
 	err = multisigAddr.Create(false)
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 
 	err = multisigAddr.Load()
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 
-	fmt.Println(multisigAddr.GetAddress())
-	fmt.Println(multisigAddr.GetCount())
+	fmt.Println("Multi-address =", multisigAddr.GetAddress())
 
 	metadata, err := json.Marshal(map[string]interface{}{
 		"0": map[string]interface{}{
-			"who":    "pera",
-			"what":   "taba-kera",
-			"health": 20,
+			"type":    "multi",
+			"atleast": atLeast,
+			"max":     cnt,
 		},
 	})
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 
-	hash, err := cardanowallethelper.SendMultiSigTx(multisigAddr, wallets, testNetMagic, socketPath, []cardanowallet.TxOutput{
+	txRaw, hash, err := cardanowallethelper.PrepareMultiSigTx(dataRetriever, multisigAddr, testNetMagic, []cardanowallet.TxOutput{
 		{
 			Addr:   "addr_test1vqjysa7p4mhu0l25qknwznvj0kghtr29ud7zp732ezwtzec0w8g3u",
 			Amount: cardanowallet.MinUtxoValue,
 		},
 	}, metadata)
 	if err != nil {
+		return nil, "", err
+	}
+
+	txSigned, err := cardanowallethelper.AssemblyAllWitnesses(txRaw, wallets[:atLeast])
+	if err != nil {
+		return nil, "", err
+	}
+
+	return txSigned, hash, nil
+}
+
+func submitTx(txSigned []byte, hash string, submitter cardanowallet.ITxSubmitter) error {
+	if err := submitter.SubmitTx(txSigned); err != nil {
 		return err
 	}
 
@@ -133,12 +133,32 @@ func sendMultiSigTx(cnt int, atLeast int) error {
 }
 
 func main() {
-	if err := sendMultiSigTx(3, 2); err != nil {
+	txDataRetriever, err := cardanowallet.NewTxDataRetrieverCli(testNetMagic, socketPath)
+	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
 
-	if err := sendTx(); err != nil {
+	defer txDataRetriever.Dispose()
+
+	multiSigTx, multiSigTxHash, err := createMultiSigTx(txDataRetriever, 3, 2)
+	if err != nil {
+		fmt.Printf("error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := submitTx(multiSigTx, multiSigTxHash, txDataRetriever); err != nil {
+		fmt.Printf("error: %v\n", err)
+		os.Exit(1)
+	}
+
+	sigTx, txHash, err := createTx(txDataRetriever)
+	if err != nil {
+		fmt.Printf("error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := submitTx(sigTx, txHash, txDataRetriever); err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}

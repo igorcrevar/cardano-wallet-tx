@@ -288,6 +288,9 @@ func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error 
 
 	args := []string{
 		"transaction", "build-raw",
+		"--protocol-params-file", protocolParamsFilePath,
+		"--fee", strconv.FormatUint(fee, 10),
+		"--out-file", path.Join(b.baseDirectory, draftTxFile),
 	}
 
 	for _, inp := range b.inputs {
@@ -302,18 +305,9 @@ func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error 
 		args = append(args, "--metadata-json-file", metaDataFilePath)
 	}
 
-	if protocolParamsFilePath != "" {
-		args = append(args, "--protocol-params-file", protocolParamsFilePath)
-	}
-
 	if policyFilePath != "" {
 		args = append(args, "--tx-in-script-file", policyFilePath)
 	}
-
-	args = append(args,
-		"--invalid-hereafter", strconv.FormatUint(b.timeToLive, 10),
-		"--fee", strconv.FormatUint(fee, 10),
-		"--out-file", path.Join(b.baseDirectory, draftTxFile))
 
 	_, err := runCommand(resolveCardanoCliBinary(), args)
 	return err
