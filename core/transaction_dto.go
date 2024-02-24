@@ -1,9 +1,11 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
-	"strconv"
 )
+
+type GetUTXOsForAmountHandler func(utxos []Utxo, receiversSum uint64, potentialFee uint64, minUtxo uint64) ([]TxInput, uint64, error)
 
 type TransactionDTO struct {
 	FromAddress         string
@@ -16,7 +18,8 @@ type TransactionDTO struct {
 	Policy              []byte
 	WitnessCount        int
 	PotentialFee        uint64
-	GetUTXOsForAmountFN func(utxos []Utxo, receiversSum uint64, potentialFee uint64) ([]TxInput, uint64, error)
+	GetUTXOsForAmountFN GetUTXOsForAmountHandler
+	TimeToLiveInc       uint64 // how much current slot number should be increment
 }
 
 func NewTransactionDTO(retriever ITxDataRetriever, addr string) (TransactionDTO, error) {
@@ -40,10 +43,30 @@ func NewTransactionDTO(retriever ITxDataRetriever, addr string) (TransactionDTO,
 		SlotNumber:         slot,
 		ProtocolParameters: protocolParams,
 		FromAddress:        addr,
+		TimeToLiveInc:      200,
 	}, nil
 }
 
+func (dto TransactionDTO) GetMinUtxoFromProtocolParameters() (uint64, error) {
+	var mp map[string]interface{}
+
+	if err := json.Unmarshal(dto.ProtocolParameters, &mp); err != nil {
+		return 0, err
+	}
+
+	if v := mp["minUTxOValue"]; v != nil {
+		return uint64(v.(float64)), nil
+	}
+
+	return MinUTxODefaultValue, nil
+}
+
 func (b TxBuilder) BuildWithDTO(dto TransactionDTO) ([]byte, string, error) {
+	minUtxo, err := dto.GetMinUtxoFromProtocolParameters()
+	if err != nil {
+		return nil, "", err
+	}
+
 	receiversSum := uint64(0)
 	for _, x := range dto.Outputs {
 		receiversSum += x.Amount
@@ -54,13 +77,13 @@ func (b TxBuilder) BuildWithDTO(dto TransactionDTO) ([]byte, string, error) {
 		fn = GetUTXOsForAmount
 	}
 
-	inputs, utxosSum, err := fn(dto.Utxos, receiversSum, dto.PotentialFee)
+	inputs, utxosSum, err := fn(dto.Utxos, receiversSum, dto.PotentialFee, minUtxo)
 	if err != nil {
 		return nil, "", err
 	}
 
 	b.SetTestNetMagic(dto.TestNetMagic).SetPolicy(dto.Policy, dto.WitnessCount).SetMetaData(dto.MetaData)
-	b.SetProtocolParameters(dto.ProtocolParameters).SetTimeToLive(dto.SlotNumber + 200)
+	b.SetProtocolParameters(dto.ProtocolParameters).SetTimeToLive(dto.SlotNumber + dto.TimeToLiveInc)
 	b.AddInputs(inputs...).AddOutputs(dto.Outputs...).AddOutputs(TxOutput{
 		Addr: dto.FromAddress,
 	})
@@ -85,13 +108,13 @@ func (b TxBuilder) BuildWithDTO(dto TransactionDTO) ([]byte, string, error) {
 	return txRaw, hash, nil
 }
 
-func GetUTXOsForAmount(utxos []Utxo, receiversSum uint64, potentialFee uint64) ([]TxInput, uint64, error) {
+func GetUTXOsForAmount(utxos []Utxo, receiversSum uint64, potentialFee uint64, minUtxo uint64) ([]TxInput, uint64, error) {
 	// Loop through utxos to find first input with enough tokens
 	// If we don't have this UTXO we need to use more of them
 	var (
 		amountSum   = uint64(0)
 		chosenUTXOs []TxInput
-		desired     = receiversSum + MinUtxoValue + potentialFee
+		desired     = receiversSum + minUtxo + potentialFee
 	)
 
 	for _, utxo := range utxos {
@@ -113,13 +136,5 @@ func GetUTXOsForAmount(utxos []Utxo, receiversSum uint64, potentialFee uint64) (
 		}
 	}
 
-	return nil, 0, fmt.Errorf("no enough available funds for generating transaction: %d available, %d required", amountSum, desired)
-}
-
-func getTestNetMagicArgs(testnetMagic uint) []string {
-	if testnetMagic == 0 {
-		return []string{"--mainnet"}
-	}
-
-	return []string{"--testnet-magic", strconv.FormatUint(uint64(testnetMagic), 10)}
+	return nil, 0, fmt.Errorf("not enough funds to generate the transaction: %d available vs %d required", amountSum, desired)
 }

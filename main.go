@@ -12,8 +12,10 @@ import (
 )
 
 const (
-	socketPath   = "/home/bbs/Apps/card/node.socket"
-	testNetMagic = uint(2) //1097911063
+	socketPath              = "/home/bbs/Apps/card/node.socket"
+	testNetMagic            = uint(2)
+	blockfrostUrl           = "https://cardano-preview.blockfrost.io/api/v0"
+	blockfrostProjectApiKey = "YOUR_PROJECT_ID"
 )
 
 func createTx(dataRetriever cardanowallet.ITxDataRetriever) ([]byte, string, error) {
@@ -48,7 +50,7 @@ func createTx(dataRetriever cardanowallet.ITxDataRetriever) ([]byte, string, err
 	return cardanowallethelper.PrepareSignedTx(dataRetriever, wallet, testNetMagic, []cardanowallet.TxOutput{
 		{
 			Addr:   "addr_test1vqjysa7p4mhu0l25qknwznvj0kghtr29ud7zp732ezwtzec0w8g3u",
-			Amount: cardanowallet.MinUtxoValue,
+			Amount: cardanowallet.MinUTxODefaultValue,
 		},
 	}, metadata)
 }
@@ -107,7 +109,7 @@ func createMultiSigTx(dataRetriever cardanowallet.ITxDataRetriever, cnt int, atL
 	txRaw, hash, err := cardanowallethelper.PrepareMultiSigTx(dataRetriever, multisigAddr, testNetMagic, []cardanowallet.TxOutput{
 		{
 			Addr:   "addr_test1vqjysa7p4mhu0l25qknwznvj0kghtr29ud7zp732ezwtzec0w8g3u",
-			Amount: cardanowallet.MinUtxoValue,
+			Amount: cardanowallet.MinUTxODefaultValue,
 		},
 	}, metadata)
 	if err != nil {
@@ -122,44 +124,47 @@ func createMultiSigTx(dataRetriever cardanowallet.ITxDataRetriever, cnt int, atL
 	return txSigned, hash, nil
 }
 
-func submitTx(txSigned []byte, hash string, submitter cardanowallet.ITxSubmitter) error {
-	if err := submitter.SubmitTx(txSigned); err != nil {
-		return err
+func createProvider(name string) (cardanowallet.ITxProvider, error) {
+	switch name {
+	case "blockfrost":
+		return cardanowallet.NewTxProviderBlockFrost(blockfrostUrl, blockfrostProjectApiKey)
+	default:
+		return cardanowallet.NewTxProviderCli(testNetMagic, socketPath)
 	}
-
-	fmt.Println("transaction has been submitted", hash)
-
-	return nil
 }
 
 func main() {
-	txDataRetriever, err := cardanowallet.NewTxDataRetrieverCli(testNetMagic, socketPath)
+	txProviderBF, err := createProvider("blockfrost")
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
 
-	defer txDataRetriever.Dispose()
+	defer txProviderBF.Dispose()
 
-	multiSigTx, multiSigTxHash, err := createMultiSigTx(txDataRetriever, 3, 2)
+	multiSigTx, multiSigTxHash, err := createMultiSigTx(txProviderBF, 3, 2)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
 
-	if err := submitTx(multiSigTx, multiSigTxHash, txDataRetriever); err != nil {
+	if err := txProviderBF.SubmitTx(multiSigTx); err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
 
-	sigTx, txHash, err := createTx(txDataRetriever)
+	fmt.Println("transaction has been submitted", multiSigTxHash)
+
+	sigTx, txHash, err := createTx(txProviderBF)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
 
-	if err := submitTx(sigTx, txHash, txDataRetriever); err != nil {
+	if err := txProviderBF.SubmitTx(sigTx); err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
+
+	fmt.Println("transaction has been submitted", txHash)
 }

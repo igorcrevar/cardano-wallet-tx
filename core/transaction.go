@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	MinUtxoValue = uint64(1000000)
+	MinUTxODefaultValue = uint64(1000000)
 
 	draftTxFile   = "tx.draft"
 	witnessTxFile = "witness.tx"
@@ -311,4 +311,12 @@ func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error 
 
 	_, err := runCommand(resolveCardanoCliBinary(), args)
 	return err
+}
+
+func getTestNetMagicArgs(testnetMagic uint) []string {
+	if testnetMagic == 0 {
+		return []string{"--mainnet"}
+	}
+
+	return []string{"--testnet-magic", strconv.FormatUint(uint64(testnetMagic), 10)}
 }
