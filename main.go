@@ -82,13 +82,12 @@ func createMultiSigTx(dataRetriever cardanowallet.ITxDataRetriever, cnt int, atL
 		keyHashes[i] = w.GetKeyHash()
 	}
 
-	multisigAddr := cardanowallet.NewMultiSigAddress(path.Join(currentUser.HomeDir, "cardano_multisig"), keyHashes, testNetMagic, atLeast)
-	err = multisigAddr.Create(false)
+	policyScript, err := cardanowallet.NewPolicyScript(keyHashes, atLeast)
 	if err != nil {
 		return nil, "", err
 	}
 
-	err = multisigAddr.Load()
+	multisigAddr, err := policyScript.CreateMultiSigAddress(testNetMagic)
 	if err != nil {
 		return nil, "", err
 	}

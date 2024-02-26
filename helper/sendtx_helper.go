@@ -50,11 +50,6 @@ func PrepareMultiSigTx(txDataRetriever core.ITxDataRetriever,
 
 	defer builder.Dispose()
 
-	policy, err := multisigAddr.GetPolicyScript()
-	if err != nil {
-		return nil, "", err
-	}
-
 	dto, err := core.NewTransactionDTO(txDataRetriever, multisigAddr.GetAddress())
 	if err != nil {
 		return nil, "", err
@@ -63,7 +58,7 @@ func PrepareMultiSigTx(txDataRetriever core.ITxDataRetriever,
 	dto.TestNetMagic = testNetMagic
 	dto.Outputs = outputs
 	dto.MetaData = metadata
-	dto.Policy = policy
+	dto.Policy = multisigAddr.GetPolicyScript()
 	dto.WitnessCount = multisigAddr.GetCount()
 	dto.PotentialFee = 200_000
 

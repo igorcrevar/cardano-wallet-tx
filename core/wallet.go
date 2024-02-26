@@ -34,7 +34,7 @@ func NewWallet(directory string, testNetMagic uint) *Wallet {
 }
 
 func (w *Wallet) Create(forceCreate bool) error {
-	if !forceCreate && isFileOrDirExists(w.GetVerificationKeyPath()) {
+	if !forceCreate && isFileOrDirExists(w.GetVerificationKeyPath()) && isFileOrDirExists(w.GetSigningKeyPath()) {
 		return nil
 	}
 
