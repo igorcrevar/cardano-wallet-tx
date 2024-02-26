@@ -30,7 +30,7 @@ func PrepareSignedTx(
 		return nil, "", err
 	}
 
-	txSigned, err := builder.Sign(txRaw, wallet.GetSigningKeyPath())
+	txSigned, err := builder.Sign(txRaw, wallet)
 	if err != nil {
 		return nil, "", err
 	}
@@ -75,13 +75,11 @@ func AssemblyAllWitnesses(txRaw []byte, wallets []*core.Wallet) ([]byte, error) 
 
 	witnesses := make([][]byte, len(wallets))
 
-	for i, x := range wallets {
-		witness, err := builder.AddWitness(txRaw, x.GetSigningKeyPath())
+	for i, wallet := range wallets {
+		witnesses[i], err = builder.AddWitness(txRaw, wallet)
 		if err != nil {
 			return nil, err
 		}
-
-		witnesses[i] = witness
 	}
 
 	return builder.AssembleWitnesses(txRaw, witnesses)

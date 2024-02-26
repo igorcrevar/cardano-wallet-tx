@@ -169,11 +169,16 @@ func (b *TxBuilder) Build() ([]byte, error) {
 	return os.ReadFile(path.Join(b.baseDirectory, draftTxFile))
 }
 
-func (b *TxBuilder) Sign(tx []byte, signingKeyPath string) ([]byte, error) {
-	outFilePath := path.Join(b.baseDirectory, "tx.sign")
-	txFilePath := path.Join(b.baseDirectory, "tx.tmp")
+func (b *TxBuilder) Sign(tx []byte, wallet *Wallet) ([]byte, error) {
+	outFilePath := path.Join(b.baseDirectory, "tx.sig")
+	txFilePath := path.Join(b.baseDirectory, "tx.raw")
+	signingKeyPath := path.Join(b.baseDirectory, "tx.skey")
 
 	if err := os.WriteFile(txFilePath, tx, 0755); err != nil {
+		return nil, err
+	}
+
+	if err := wallet.SaveSigningKeyToFile(signingKeyPath); err != nil {
 		return nil, err
 	}
 
@@ -192,11 +197,16 @@ func (b *TxBuilder) Sign(tx []byte, signingKeyPath string) ([]byte, error) {
 	return os.ReadFile(outFilePath)
 }
 
-func (b *TxBuilder) AddWitness(tx []byte, signingKeyPath string) ([]byte, error) {
-	outFilePath := path.Join(b.baseDirectory, "witness.tmp")
-	txFilePath := path.Join(b.baseDirectory, "tx.tmp")
+func (b *TxBuilder) AddWitness(tx []byte, wallet *Wallet) ([]byte, error) {
+	outFilePath := path.Join(b.baseDirectory, "tx.wit")
+	txFilePath := path.Join(b.baseDirectory, "tx.raw")
+	signingKeyPath := path.Join(b.baseDirectory, "tx.skey")
 
 	if err := os.WriteFile(txFilePath, tx, 0755); err != nil {
+		return nil, err
+	}
+
+	if err := wallet.SaveSigningKeyToFile(signingKeyPath); err != nil {
 		return nil, err
 	}
 
@@ -216,8 +226,8 @@ func (b *TxBuilder) AddWitness(tx []byte, signingKeyPath string) ([]byte, error)
 }
 
 func (b *TxBuilder) AssembleWitnesses(tx []byte, witnesses [][]byte) ([]byte, error) {
-	outFilePath := path.Join(b.baseDirectory, "tx.signed")
-	txFilePath := path.Join(b.baseDirectory, "tx.tmp")
+	outFilePath := path.Join(b.baseDirectory, "tx.sig")
+	txFilePath := path.Join(b.baseDirectory, "tx.raw")
 	witnessesFilePaths := make([]string, len(witnesses))
 
 	for i, content := range witnesses {
