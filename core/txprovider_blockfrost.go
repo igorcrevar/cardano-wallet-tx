@@ -79,7 +79,9 @@ func (b *TxProviderBlockFrost) GetUtxos(addr string) ([]Utxo, error) {
 	defer resp.Body.Close()
 
 	// Check the HTTP status code
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode == http.StatusNotFound {
+		return []Utxo{}, nil // this address does not have any UTxOs
+	} else if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("status code is %d", resp.StatusCode)
 	}
 

@@ -21,3 +21,14 @@ type ITxProvider interface {
 	ITxDataRetriever
 	Dispose()
 }
+
+type IWallet interface {
+	GetAddress() string
+	GetVerificationKey() []byte
+	GetSigningKey() []byte
+	GetKeyHash() string
+}
+
+type IWalletBuilder interface {
+	Create(forceCreate bool) error
+}

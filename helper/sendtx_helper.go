@@ -4,7 +4,7 @@ import "github.com/igorcrevar/cardano-wallet-tx/core"
 
 func PrepareSignedTx(
 	txDataRetriever core.ITxDataRetriever,
-	wallet *core.Wallet,
+	wallet core.IWallet,
 	testNetMagic uint,
 	outputs []core.TxOutput,
 	metadata []byte) ([]byte, string, error) {
@@ -65,7 +65,7 @@ func PrepareMultiSigTx(txDataRetriever core.ITxDataRetriever,
 	return builder.BuildWithDTO(dto)
 }
 
-func AssemblyAllWitnesses(txRaw []byte, wallets []*core.Wallet) ([]byte, error) {
+func AssemblyAllWitnesses[T core.IWallet](txRaw []byte, wallets []T) ([]byte, error) {
 	builder, err := core.NewTxBuilder()
 	if err != nil {
 		return nil, err

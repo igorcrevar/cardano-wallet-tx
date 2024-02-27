@@ -4,15 +4,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"os"
-	"path"
-	"strings"
 
 	"github.com/fxamacker/cbor/v2"
-)
-
-const (
-	verificationKeyFile = "payment.vkey"
-	signingKeyFile      = "payment.skey"
 )
 
 type Wallet struct {
@@ -47,102 +40,33 @@ func (w Wallet) GetKeyHash() string {
 	return w.keyHash
 }
 
-func (w Wallet) SaveVerificationKeyToFile(filePath string) error {
-	verificationKey, err := NewKeyFromBytes("PaymentVerificationKeyShelley_ed25519", "Payment Verification Key", w.verificationKey)
-	if err != nil {
-		return err
-	}
-
-	return verificationKey.WriteToFile(filePath)
+type StakeWallet struct {
+	*Wallet
+	stakeAddress         string
+	stakeVerificationKey []byte
+	stakeSigningKey      []byte
 }
 
-func (w Wallet) SaveSigningKeyToFile(filePath string) error {
-	signingKey, err := NewKeyFromBytes("PaymentSigningKeyShelley_ed25519", "Payment Signing Key", w.signingKey)
-	if err != nil {
-		return err
-	}
-
-	return signingKey.WriteToFile(filePath)
-}
-
-type WalletBuilder struct {
-	directory    string
-	testNetMagic uint
-}
-
-func NewWalletBuilder(directory string, testNetMagic uint) *WalletBuilder {
-	return &WalletBuilder{
-		directory:    directory,
-		testNetMagic: testNetMagic,
+func NewStakeWallet(address string, verificationKey []byte, signingKey []byte, keyHash string,
+	stakeAddress string, stakeVerificationKey []byte, stakeSigningKey []byte) *StakeWallet {
+	return &StakeWallet{
+		stakeAddress:         stakeAddress,
+		stakeVerificationKey: stakeVerificationKey,
+		stakeSigningKey:      stakeSigningKey,
+		Wallet:               NewWallet(address, verificationKey, signingKey, keyHash),
 	}
 }
 
-func (w *WalletBuilder) Create(forceCreate bool) error {
-	if !forceCreate && isFileOrDirExists(w.GetVerificationKeyPath()) && isFileOrDirExists(w.GetSigningKeyPath()) {
-		return nil
-	}
-
-	if err := createDirectoryIfNotExists(w.directory); err != nil {
-		return err
-	}
-
-	_, err := runCommand(resolveCardanoCliBinary(), []string{
-		"address", "key-gen",
-		"--verification-key-file", w.GetVerificationKeyPath(),
-		"--signing-key-file", w.GetSigningKeyPath(),
-	})
-	return err
+func (w StakeWallet) GetStakeAddress() string {
+	return w.stakeAddress
 }
 
-func (w *WalletBuilder) Load() (*Wallet, error) {
-	verificationKey, err := NewKey(w.GetVerificationKeyPath())
-	if err != nil {
-		return nil, err
-	}
-
-	verificationKeyBytes, err := verificationKey.GetKeyBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	signingKey, err := NewKey(w.GetSigningKeyPath())
-	if err != nil {
-		return nil, err
-	}
-
-	signingKeyBytes, err := signingKey.GetKeyBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	resultAddress, err := runCommand(resolveCardanoCliBinary(), append([]string{
-		"address", "build",
-		"--payment-verification-key-file", w.GetVerificationKeyPath(),
-	}, getTestNetMagicArgs(w.testNetMagic)...))
-	if err != nil {
-		return nil, err
-	}
-
-	resultKeyHash, err := runCommand(resolveCardanoCliBinary(), []string{
-		"address", "key-hash",
-		"--payment-verification-key-file", w.GetVerificationKeyPath(),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	address := strings.Trim(resultAddress, "\n")
-	keyHash := strings.Trim(resultKeyHash, "\n")
-
-	return NewWallet(address, verificationKeyBytes, signingKeyBytes, keyHash), nil
+func (w StakeWallet) GetStakeVerificationKey() []byte {
+	return w.stakeVerificationKey
 }
 
-func (w WalletBuilder) GetSigningKeyPath() string {
-	return path.Join(w.directory, signingKeyFile)
-}
-
-func (w WalletBuilder) GetVerificationKeyPath() string {
-	return path.Join(w.directory, verificationKeyFile)
+func (w StakeWallet) GetStakeSigningKey() []byte {
+	return w.stakeSigningKey
 }
 
 type Key struct {
@@ -205,4 +129,38 @@ func (k Key) WriteToFile(filePath string) error {
 	}
 
 	return nil
+}
+
+func SaveKeyBytesToFile(keyBytes []byte, filePath string, isSigningKey bool, isStakeKey bool) error {
+	var title, desc string
+
+	if isStakeKey {
+		if isSigningKey {
+			title, desc = "StakeSigningKeyShelley_ed25519", "Stake Signing Key"
+		} else {
+			title, desc = "StakeVerificationKeyShelley_ed25519", "Stake Verification Key"
+		}
+	} else {
+		if isSigningKey {
+			title, desc = "PaymentSigningKeyShelley_ed25519", "Payment Signing Key"
+		} else {
+			title, desc = "PaymentVerificationKeyShelley_ed25519", "Payment Verification Key"
+		}
+	}
+
+	key, err := NewKeyFromBytes(title, desc, keyBytes)
+	if err != nil {
+		return err
+	}
+
+	return key.WriteToFile(filePath)
+}
+
+func getKeyBytes(filePath string) ([]byte, error) {
+	key, err := NewKey(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	return key.GetKeyBytes()
 }

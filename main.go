@@ -19,7 +19,7 @@ const (
 )
 
 func createTx(dataRetriever cardanowallet.ITxDataRetriever, keyDirectory string) ([]byte, string, error) {
-	walletBuilder := cardanowallet.NewWalletBuilder(path.Join(keyDirectory, "cardano_wallet"), testNetMagic)
+	walletBuilder := cardanowallet.NewStakeWalletBuilder(path.Join(keyDirectory, "cardano_wallet_stake"), testNetMagic)
 
 	if err := walletBuilder.Create(false); err != nil {
 		return nil, "", err
@@ -50,11 +50,11 @@ func createTx(dataRetriever cardanowallet.ITxDataRetriever, keyDirectory string)
 }
 
 func createMultiSigTx(dataRetriever cardanowallet.ITxDataRetriever, cnt int, atLeast int, keyDirectory string) ([]byte, string, error) {
-	wallets := make([]*cardanowallet.Wallet, cnt)
+	wallets := make([]*cardanowallet.StakeWallet, cnt)
 	keyHashes := make([]string, len(wallets))
 
 	for i := 0; i < cnt; i++ {
-		walletBuilder := cardanowallet.NewWalletBuilder(path.Join(keyDirectory, fmt.Sprintf("cardano_wallet_%d", i+1)), testNetMagic)
+		walletBuilder := cardanowallet.NewStakeWalletBuilder(path.Join(keyDirectory, fmt.Sprintf("cardano_wallet_stake_%d", i+1)), testNetMagic)
 
 		err := walletBuilder.Create(false)
 		if err != nil {

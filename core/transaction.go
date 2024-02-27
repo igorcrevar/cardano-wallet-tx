@@ -169,7 +169,7 @@ func (b *TxBuilder) Build() ([]byte, error) {
 	return os.ReadFile(path.Join(b.baseDirectory, draftTxFile))
 }
 
-func (b *TxBuilder) Sign(tx []byte, wallet *Wallet) ([]byte, error) {
+func (b *TxBuilder) Sign(tx []byte, wallet IWallet) ([]byte, error) {
 	outFilePath := path.Join(b.baseDirectory, "tx.sig")
 	txFilePath := path.Join(b.baseDirectory, "tx.raw")
 	signingKeyPath := path.Join(b.baseDirectory, "tx.skey")
@@ -178,7 +178,7 @@ func (b *TxBuilder) Sign(tx []byte, wallet *Wallet) ([]byte, error) {
 		return nil, err
 	}
 
-	if err := wallet.SaveSigningKeyToFile(signingKeyPath); err != nil {
+	if err := SaveKeyBytesToFile(wallet.GetSigningKey(), signingKeyPath, true, false); err != nil {
 		return nil, err
 	}
 
@@ -197,7 +197,7 @@ func (b *TxBuilder) Sign(tx []byte, wallet *Wallet) ([]byte, error) {
 	return os.ReadFile(outFilePath)
 }
 
-func (b *TxBuilder) AddWitness(tx []byte, wallet *Wallet) ([]byte, error) {
+func (b *TxBuilder) AddWitness(tx []byte, wallet IWallet) ([]byte, error) {
 	outFilePath := path.Join(b.baseDirectory, "tx.wit")
 	txFilePath := path.Join(b.baseDirectory, "tx.raw")
 	signingKeyPath := path.Join(b.baseDirectory, "tx.skey")
@@ -206,7 +206,7 @@ func (b *TxBuilder) AddWitness(tx []byte, wallet *Wallet) ([]byte, error) {
 		return nil, err
 	}
 
-	if err := wallet.SaveSigningKeyToFile(signingKeyPath); err != nil {
+	if err := SaveKeyBytesToFile(wallet.GetSigningKey(), signingKeyPath, true, false); err != nil {
 		return nil, err
 	}
 
