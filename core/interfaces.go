@@ -30,5 +30,5 @@ type IWallet interface {
 }
 
 type IWalletBuilder interface {
-	Create(forceCreate bool) error
+	Create(directory string, forceCreate bool) (IWallet, error)
 }

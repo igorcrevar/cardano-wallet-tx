@@ -49,15 +49,6 @@ func runCommand(binary string, args []string, envVariables ...string) (string, e
 	return stdOutBuffer.String(), nil
 }
 
-func createDirectoryIfNotExists(dirPath string) error {
-	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
-		// If the directory doesn't exist, create it
-		return os.MkdirAll(dirPath, 0755)
-	}
-
-	return nil
-}
-
 func isFileOrDirExists(fileOrDirPath string) bool {
 	_, err := os.Stat(fileOrDirPath)
 	return err == nil || !os.IsNotExist(err)

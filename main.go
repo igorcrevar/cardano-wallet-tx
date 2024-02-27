@@ -18,14 +18,9 @@ const (
 	blockfrostProjectApiKey = "YOUR_PROJECT_ID"
 )
 
-func createTx(dataRetriever cardanowallet.ITxDataRetriever, keyDirectory string) ([]byte, string, error) {
-	walletBuilder := cardanowallet.NewStakeWalletBuilder(path.Join(keyDirectory, "cardano_wallet_stake"), testNetMagic)
-
-	if err := walletBuilder.Create(false); err != nil {
-		return nil, "", err
-	}
-
-	wallet, err := walletBuilder.Load()
+func createTx(dataRetriever cardanowallet.ITxDataRetriever, walletBuilder cardanowallet.IWalletBuilder,
+	keyDirectory string) ([]byte, string, error) {
+	wallet, err := walletBuilder.Create(path.Join(keyDirectory, "cardano_wallet_stake"), false)
 	if err != nil {
 		return nil, "", err
 	}
@@ -49,24 +44,21 @@ func createTx(dataRetriever cardanowallet.ITxDataRetriever, keyDirectory string)
 	}, metadata)
 }
 
-func createMultiSigTx(dataRetriever cardanowallet.ITxDataRetriever, cnt int, atLeast int, keyDirectory string) ([]byte, string, error) {
+func createMultiSigTx(dataRetriever cardanowallet.ITxDataRetriever, walletBuilder cardanowallet.IWalletBuilder,
+	cnt int, atLeast int, keyDirectory string) ([]byte, string, error) {
 	wallets := make([]*cardanowallet.StakeWallet, cnt)
 	keyHashes := make([]string, len(wallets))
 
 	for i := 0; i < cnt; i++ {
-		walletBuilder := cardanowallet.NewStakeWalletBuilder(path.Join(keyDirectory, fmt.Sprintf("cardano_wallet_stake_%d", i+1)), testNetMagic)
+		suffix := fmt.Sprintf("cardano_wallet_stake_%d", i+1)
 
-		err := walletBuilder.Create(false)
+		wallet, err := walletBuilder.Create(path.Join(keyDirectory, suffix), false)
 		if err != nil {
 			return nil, "", err
 		}
 
-		wallets[i], err = walletBuilder.Load()
-		if err != nil {
-			return nil, "", err
-		}
-
-		keyHashes[i] = wallets[i].GetKeyHash()
+		keyHashes[i] = wallet.GetKeyHash()
+		wallets[i] = wallet.(*cardanowallet.StakeWallet)
 	}
 
 	policyScript, err := cardanowallet.NewPolicyScript(keyHashes, atLeast)
@@ -119,12 +111,16 @@ func createProvider(name string) (cardanowallet.ITxProvider, error) {
 	}
 }
 
-func main() {
-	currentUser, err := user.Current()
-	if err != nil {
-		fmt.Printf("error: %v\n", err)
-		os.Exit(1)
+func createWalletBuilder(isStake bool) cardanowallet.IWalletBuilder {
+	if isStake {
+		return cardanowallet.NewStakeWalletBuilder(testNetMagic)
 	}
+
+	return cardanowallet.NewWalletBuilder(testNetMagic)
+}
+
+func main() {
+	walletBuilder := createWalletBuilder(true)
 
 	txProviderBF, err := createProvider("blockfrost")
 	if err != nil {
@@ -134,7 +130,13 @@ func main() {
 
 	defer txProviderBF.Dispose()
 
-	multiSigTx, multiSigTxHash, err := createMultiSigTx(txProviderBF, 3, 2, currentUser.HomeDir)
+	currentUser, err := user.Current()
+	if err != nil {
+		fmt.Printf("error: %v\n", err)
+		os.Exit(1)
+	}
+
+	multiSigTx, multiSigTxHash, err := createMultiSigTx(txProviderBF, walletBuilder, 3, 2, currentUser.HomeDir)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
@@ -147,7 +149,7 @@ func main() {
 
 	fmt.Println("transaction has been submitted", multiSigTxHash)
 
-	sigTx, txHash, err := createTx(txProviderBF, currentUser.HomeDir)
+	sigTx, txHash, err := createTx(txProviderBF, walletBuilder, currentUser.HomeDir)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
