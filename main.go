@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/user"
 	"path"
+	"time"
 
 	cardanowallet "github.com/igorcrevar/cardano-wallet-tx/core"
 	cardanowallethelper "github.com/igorcrevar/cardano-wallet-tx/helper"
@@ -15,7 +17,7 @@ const (
 	socketPath              = "/home/bbs/Apps/card/node.socket"
 	testNetMagic            = uint(2)
 	blockfrostUrl           = "https://cardano-preview.blockfrost.io/api/v0"
-	blockfrostProjectApiKey = "YOUR_PROJECT_ID"
+	blockfrostProjectApiKey = "preview7mGSjpyEKb24OxQ4cCxomxZ5axMs5PvE"
 )
 
 func createTx(dataRetriever cardanowallet.ITxDataRetriever, walletBuilder cardanowallet.IWalletBuilder,
@@ -147,7 +149,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("transaction has been submitted", multiSigTxHash)
+	txRetriever := txProviderBF.(cardanowallet.ITxRetriever)
+
+	txData, err := cardanowallet.WaitForTransaction(context.Background(), txRetriever, multiSigTxHash, 100, time.Second*2)
+	if err != nil {
+		fmt.Printf("error waiting for multisig transaction: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("transaction has been submitted", multiSigTxHash, txData["block"])
 
 	sigTx, txHash, err := createTx(txProviderBF, walletBuilder, currentUser.HomeDir)
 	if err != nil {
@@ -160,5 +170,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("transaction has been submitted", txHash)
+	txData, err = cardanowallet.WaitForTransaction(context.Background(), txRetriever, txHash, 100, time.Second*2)
+	if err != nil {
+		fmt.Printf("error waiting for transaction: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("transaction has been submitted", txHash, txData["block"])
 }

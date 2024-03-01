@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -199,6 +200,40 @@ func (b *TxProviderBlockFrost) SubmitTx(tx []byte) error {
 	}
 
 	return nil
+}
+
+func (b *TxProviderBlockFrost) GetTxByHash(hash string) (map[string]interface{}, error) {
+	// Create a request with the JSON payload
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/txs/%s", b.url, hash), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the Content-Type header to application/json
+	req.Header.Set("project_id", b.projectID)
+
+	// Make the HTTP request
+	resp, err := new(http.Client).Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	var responseData map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&responseData); err != nil {
+		return nil, err
+	}
+
+	if err := responseData["error"]; err != nil {
+		if err.(string) == "Not Found" {
+			return nil, nil
+		}
+
+		return nil, errors.New(responseData["message"].(string))
+	}
+
+	return responseData, nil
 }
 
 func convertProtocolParameters(bytes []byte) ([]byte, error) {

@@ -1,8 +1,11 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
+	"time"
 )
 
 type AddressType string
@@ -61,4 +64,24 @@ func GetAddressInfo(address string, addressType AddressType) AddressInfo {
 	}
 
 	return ai
+}
+
+func WaitForTransaction(ctx context.Context, txRetriever ITxRetriever,
+	hash string, numRetries int, waitTime time.Duration) (map[string]interface{}, error) {
+	for count := 0; count < numRetries; count++ {
+		result, err := txRetriever.GetTxByHash(hash)
+		if err != nil {
+			return nil, err
+		} else if result != nil {
+			return result, nil
+		}
+
+		select {
+		case <-time.After(waitTime):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+
+	return nil, fmt.Errorf("timeout while waiting for transaction %s to be processed", hash)
 }

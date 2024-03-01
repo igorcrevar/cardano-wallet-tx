@@ -10,6 +10,10 @@ type ITxSubmitter interface {
 	SubmitTx(tx []byte) error
 }
 
+type ITxRetriever interface {
+	GetTxByHash(hash string) (map[string]interface{}, error)
+}
+
 type ITxDataRetriever interface {
 	GetSlot() (uint64, error)
 	GetUtxos(addr string) ([]Utxo, error)
