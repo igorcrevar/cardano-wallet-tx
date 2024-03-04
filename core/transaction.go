@@ -11,9 +11,8 @@ import (
 
 const (
 	MinUTxODefaultValue = uint64(1000000)
-
-	draftTxFile   = "tx.draft"
-	witnessTxFile = "witness.tx"
+	draftTxFile         = "tx.draft"
+	witnessTxFile       = "witness.tx"
 )
 
 type TxInput struct {
@@ -23,6 +22,11 @@ type TxInput struct {
 
 func (i TxInput) String() string {
 	return fmt.Sprintf("%s#%d", i.Hash, i.Index)
+}
+
+type TxInputWithPolicyScript struct {
+	Input        TxInput
+	PolicyScript IPolicyScript
 }
 
 type TxOutput struct {
@@ -36,11 +40,9 @@ func (o TxOutput) String() string {
 
 type TxBuilder struct {
 	baseDirectory      string
-	inputs             []TxInput
+	inputs             []TxInputWithPolicyScript
 	outputs            []TxOutput
 	metadata           []byte
-	policy             []byte
-	witnessCount       int
 	protocolParameters []byte
 	timeToLive         uint64
 	testNetMagic       uint
@@ -60,6 +62,7 @@ func NewTxBuilder() (*TxBuilder, error) {
 
 func (b *TxBuilder) Dispose() {
 	os.RemoveAll(b.baseDirectory)
+	os.Remove(b.baseDirectory)
 }
 
 func (b *TxBuilder) SetTestNetMagic(testNetMagic uint) *TxBuilder {
@@ -74,8 +77,39 @@ func (b *TxBuilder) SetFee(fee uint64) *TxBuilder {
 	return b
 }
 
+func (b *TxBuilder) AddInputsWithScript(script IPolicyScript, inputs ...TxInput) *TxBuilder {
+	for _, inp := range inputs {
+		b.inputs = append(b.inputs, TxInputWithPolicyScript{
+			Input:        inp,
+			PolicyScript: script,
+		})
+	}
+
+	return b
+}
+
+func (b *TxBuilder) AddInputsWithScripts(inputs []TxInput, scripts []IPolicyScript) *TxBuilder {
+	cnt := len(inputs)
+	if l := len(scripts); cnt > l {
+		cnt = l
+	}
+
+	for i, inp := range inputs[:cnt] {
+		b.inputs = append(b.inputs, TxInputWithPolicyScript{
+			Input:        inp,
+			PolicyScript: scripts[i],
+		})
+	}
+
+	return b
+}
+
 func (b *TxBuilder) AddInputs(inputs ...TxInput) *TxBuilder {
-	b.inputs = append(b.inputs, inputs...)
+	for _, inp := range inputs {
+		b.inputs = append(b.inputs, TxInputWithPolicyScript{
+			Input: inp,
+		})
+	}
 
 	return b
 }
@@ -86,15 +120,12 @@ func (b *TxBuilder) AddOutputs(outputs ...TxOutput) *TxBuilder {
 	return b
 }
 
-func (b *TxBuilder) UpdateLastOutputAmount(amount uint64) *TxBuilder {
-	b.outputs[len(b.outputs)-1].Amount = amount
+func (b *TxBuilder) UpdateOutputAmount(index int, amount uint64) *TxBuilder {
+	if index < 0 {
+		index = len(b.outputs) + index
+	}
 
-	return b
-}
-
-func (b *TxBuilder) SetPolicy(policy []byte, witnessCount int) *TxBuilder {
-	b.policy = policy
-	b.witnessCount = witnessCount
+	b.outputs[index].Amount = amount
 
 	return b
 }
@@ -117,7 +148,7 @@ func (b *TxBuilder) SetTimeToLive(timeToLive uint64) *TxBuilder {
 	return b
 }
 
-func (b *TxBuilder) CalculateFee() (uint64, error) {
+func (b *TxBuilder) CalculateFee(witnessCount int) (uint64, error) {
 	if b.protocolParameters == nil {
 		return 0, errors.New("protocol parameters not set")
 	}
@@ -131,9 +162,14 @@ func (b *TxBuilder) CalculateFee() (uint64, error) {
 		return 0, err
 	}
 
-	witnessCount := b.witnessCount
 	if witnessCount == 0 {
-		witnessCount = 1
+		for _, x := range b.inputs {
+			witnessCount += x.PolicyScript.GetCount()
+		}
+
+		if witnessCount == 0 {
+			witnessCount = 1
+		}
 	}
 
 	feeOutput, err := runCommand(resolveCardanoCliBinary(), append([]string{
@@ -169,25 +205,28 @@ func (b *TxBuilder) Build() ([]byte, error) {
 	return os.ReadFile(path.Join(b.baseDirectory, draftTxFile))
 }
 
-func (b *TxBuilder) Sign(tx []byte, wallet IWallet) ([]byte, error) {
+func (b *TxBuilder) Sign(tx []byte, wallets []ISigningKeyRetriver) ([]byte, error) {
 	outFilePath := path.Join(b.baseDirectory, "tx.sig")
 	txFilePath := path.Join(b.baseDirectory, "tx.raw")
-	signingKeyPath := path.Join(b.baseDirectory, "tx.skey")
 
 	if err := os.WriteFile(txFilePath, tx, 0755); err != nil {
 		return nil, err
 	}
 
-	if err := SaveKeyBytesToFile(wallet.GetSigningKey(), signingKeyPath, true, false); err != nil {
-		return nil, err
-	}
-
 	args := append([]string{
 		"transaction", "sign",
-		"--signing-key-file", signingKeyPath,
 		"--tx-body-file", txFilePath,
 		"--out-file", outFilePath},
 		getTestNetMagicArgs(b.testNetMagic)...)
+
+	for i, wallet := range wallets {
+		signingKeyPath := path.Join(b.baseDirectory, fmt.Sprintf("tx_%d.skey", i))
+		if err := SaveKeyBytesToFile(wallet.GetSigningKey(), signingKeyPath, true, false); err != nil {
+			return nil, err
+		}
+
+		args = append(args, "--signing-key-file", signingKeyPath)
+	}
 
 	_, err := runCommand(resolveCardanoCliBinary(), args)
 	if err != nil {
@@ -197,7 +236,7 @@ func (b *TxBuilder) Sign(tx []byte, wallet IWallet) ([]byte, error) {
 	return os.ReadFile(outFilePath)
 }
 
-func (b *TxBuilder) AddWitness(tx []byte, wallet IWallet) ([]byte, error) {
+func (b *TxBuilder) AddWitness(tx []byte, wallet ISigningKeyRetriver) ([]byte, error) {
 	outFilePath := path.Join(b.baseDirectory, "tx.wit")
 	txFilePath := path.Join(b.baseDirectory, "tx.raw")
 	signingKeyPath := path.Join(b.baseDirectory, "tx.skey")
@@ -289,13 +328,6 @@ func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error 
 		}
 	}
 
-	if b.policy != nil {
-		policyFilePath = path.Join(b.baseDirectory, "policy.json")
-		if err := os.WriteFile(policyFilePath, b.policy, 0755); err != nil {
-			return err
-		}
-	}
-
 	args := []string{
 		"transaction", "build-raw",
 		"--protocol-params-file", protocolParamsFilePath,
@@ -303,8 +335,17 @@ func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error 
 		"--out-file", path.Join(b.baseDirectory, draftTxFile),
 	}
 
-	for _, inp := range b.inputs {
-		args = append(args, "--tx-in", inp.String())
+	for i, inp := range b.inputs {
+		args = append(args, "--tx-in", inp.Input.String())
+
+		if inp.PolicyScript != nil {
+			policyFilePath = path.Join(b.baseDirectory, fmt.Sprintf("policy_%d.json", i))
+			if err := os.WriteFile(policyFilePath, inp.PolicyScript.GetPolicyScript(), 0755); err != nil {
+				return err
+			}
+
+			args = append(args, "--tx-in-script-file", policyFilePath)
+		}
 	}
 
 	for _, out := range b.outputs {
@@ -313,10 +354,6 @@ func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error 
 
 	if metaDataFilePath != "" {
 		args = append(args, "--metadata-json-file", metaDataFilePath)
-	}
-
-	if policyFilePath != "" {
-		args = append(args, "--tx-in-script-file", policyFilePath)
 	}
 
 	_, err := runCommand(resolveCardanoCliBinary(), args)

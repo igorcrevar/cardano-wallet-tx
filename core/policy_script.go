@@ -7,35 +7,9 @@ import (
 	"strings"
 )
 
-type MultisigAddress struct {
-	policyScript []byte
-	address      string
-	count        int
-}
-
-func NewMultiSigAddress(address string, policyScript []byte, count int) *MultisigAddress {
-	return &MultisigAddress{
-		address:      address,
-		policyScript: policyScript,
-		count:        count,
-	}
-}
-
-func (ma MultisigAddress) GetAddress() string {
-	return ma.address
-}
-
-func (ma MultisigAddress) GetCount() int {
-	return ma.count
-}
-
-func (ma MultisigAddress) GetPolicyScript() []byte {
-	return ma.policyScript
-}
-
 type PolicyScript struct {
-	policyScript []byte
-	count        int
+	PolicyScript []byte `json:"ps"`
+	Count        int    `json:"cnt"`
 }
 
 func NewPolicyScript(keyHashes []string, atLeastSignersCount int) (*PolicyScript, error) {
@@ -45,22 +19,25 @@ func NewPolicyScript(keyHashes []string, atLeastSignersCount int) (*PolicyScript
 	}
 
 	return &PolicyScript{
-		policyScript: policyScript,
-		count:        len(keyHashes),
+		PolicyScript: policyScript,
+		Count:        len(keyHashes),
 	}, nil
 }
 
-func (ps PolicyScript) CreateMultiSigAddress(testNetMagic uint) (*MultisigAddress, error) {
+func (ps PolicyScript) CreateMultiSigAddress(testNetMagic uint) (string, error) {
 	baseDirectory, err := os.MkdirTemp("", "cardano-multisig-addr")
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	defer os.RemoveAll(baseDirectory)
+	defer func() {
+		os.RemoveAll(baseDirectory)
+		os.Remove(baseDirectory)
+	}()
 
 	policyScriptFilePath := path.Join(baseDirectory, "policy-script.json")
-	if err := os.WriteFile(policyScriptFilePath, ps.policyScript, 0755); err != nil {
-		return nil, err
+	if err := os.WriteFile(policyScriptFilePath, ps.PolicyScript, 0755); err != nil {
+		return "", err
 	}
 
 	response, err := runCommand(resolveCardanoCliBinary(), append([]string{
@@ -68,10 +45,18 @@ func (ps PolicyScript) CreateMultiSigAddress(testNetMagic uint) (*MultisigAddres
 		"--payment-script-file", policyScriptFilePath,
 	}, getTestNetMagicArgs(testNetMagic)...))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return NewMultiSigAddress(strings.Trim(response, "\n"), ps.policyScript, ps.count), nil
+	return strings.Trim(response, "\n"), nil
+}
+
+func (ps PolicyScript) GetPolicyScript() []byte {
+	return ps.PolicyScript
+}
+
+func (ps PolicyScript) GetCount() int {
+	return ps.Count
 }
 
 func createPolicyScript(keyHashes []string, atLeastSignersCount int) ([]byte, error) {

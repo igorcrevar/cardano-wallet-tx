@@ -16,23 +16,36 @@ type ITxRetriever interface {
 
 type ITxDataRetriever interface {
 	GetSlot() (uint64, error)
-	GetUtxos(addr string) ([]Utxo, error)
 	GetProtocolParameters() ([]byte, error)
+}
+
+type IUTxORetriever interface {
+	GetUtxos(addr string) ([]Utxo, error)
 }
 
 type ITxProvider interface {
 	ITxSubmitter
 	ITxDataRetriever
+	IUTxORetriever
 	Dispose()
 }
 
+type ISigningKeyRetriver interface {
+	GetSigningKey() []byte
+}
+
 type IWallet interface {
+	ISigningKeyRetriver
 	GetAddress() string
 	GetVerificationKey() []byte
-	GetSigningKey() []byte
 	GetKeyHash() string
 }
 
 type IWalletBuilder interface {
 	Create(directory string, forceCreate bool) (IWallet, error)
+}
+
+type IPolicyScript interface {
+	GetPolicyScript() []byte
+	GetCount() int
 }

@@ -30,6 +30,7 @@ func NewTxProviderCli(testNetMagic uint, socketPath string) (*TxProviderCli, err
 
 func (b *TxProviderCli) Dispose() {
 	os.RemoveAll(b.baseDirectory)
+	os.Remove(b.baseDirectory)
 }
 
 func (b *TxProviderCli) GetProtocolParameters() ([]byte, error) {

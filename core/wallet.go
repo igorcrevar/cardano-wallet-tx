@@ -9,64 +9,64 @@ import (
 )
 
 type Wallet struct {
-	address         string
-	verificationKey []byte
-	signingKey      []byte
-	keyHash         string
+	Address         string `json:"address"`
+	VerificationKey []byte `json:"verificationKey"`
+	SigningKey      []byte `json:"signingKey"`
+	KeyHash         string `json:"keyHash"`
 }
 
 func NewWallet(address string, verificationKey []byte, signingKey []byte, keyHash string) *Wallet {
 	return &Wallet{
-		address:         address,
-		verificationKey: verificationKey,
-		signingKey:      signingKey,
-		keyHash:         keyHash,
+		Address:         address,
+		VerificationKey: verificationKey,
+		SigningKey:      signingKey,
+		KeyHash:         keyHash,
 	}
 }
 
 func (w Wallet) GetAddress() string {
-	return w.address
+	return w.Address
 }
 
 func (w Wallet) GetVerificationKey() []byte {
-	return w.verificationKey
+	return w.VerificationKey
 }
 
 func (w Wallet) GetSigningKey() []byte {
-	return w.signingKey
+	return w.SigningKey
 }
 
 func (w Wallet) GetKeyHash() string {
-	return w.keyHash
+	return w.KeyHash
 }
 
 type StakeWallet struct {
 	*Wallet
-	stakeAddress         string
-	stakeVerificationKey []byte
-	stakeSigningKey      []byte
+	StakeAddress         string `json:"stakeAddress"`
+	StakeVerificationKey []byte `json:"stakeVerificationKey"`
+	StakeSigningKey      []byte `json:"stakeSigningKey"`
 }
 
 func NewStakeWallet(address string, verificationKey []byte, signingKey []byte, keyHash string,
 	stakeAddress string, stakeVerificationKey []byte, stakeSigningKey []byte) *StakeWallet {
 	return &StakeWallet{
-		stakeAddress:         stakeAddress,
-		stakeVerificationKey: stakeVerificationKey,
-		stakeSigningKey:      stakeSigningKey,
+		StakeAddress:         stakeAddress,
+		StakeVerificationKey: stakeVerificationKey,
+		StakeSigningKey:      stakeSigningKey,
 		Wallet:               NewWallet(address, verificationKey, signingKey, keyHash),
 	}
 }
 
 func (w StakeWallet) GetStakeAddress() string {
-	return w.stakeAddress
+	return w.StakeAddress
 }
 
 func (w StakeWallet) GetStakeVerificationKey() []byte {
-	return w.stakeVerificationKey
+	return w.StakeVerificationKey
 }
 
 func (w StakeWallet) GetStakeSigningKey() []byte {
-	return w.stakeSigningKey
+	return w.StakeSigningKey
 }
 
 type Key struct {
