@@ -1,7 +1,13 @@
 package core
 
 import (
+	"encoding/hex"
+	"strings"
 	"testing"
+
+	"github.com/fxamacker/cbor/v2"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsValidCardanoAddress(t *testing.T) {
@@ -47,8 +53,33 @@ func TestIsValidCardanoAddress(t *testing.T) {
 
 	for i, addr := range addresses {
 		ai := GetAddressInfo(addr, testNetwork[i])
-		if results[i] != ai.IsValid {
-			t.Error("Validation of address failed", "addr", addr)
-		}
+		assert.Equal(t, results[i], ai.IsValid)
 	}
+}
+
+func TestVerifyWitness(t *testing.T) {
+	var (
+		txHash             = "7e8b59e41d2ba71888272a14cff401268fa01dceb19014f5dda7763334b8f221"
+		signingKey, _      = hex.DecodeString("1217236ac24d8ac12684b308cf9468f68ef5283096896dc1c5c3caf8351e2847")                                                                                                                                           // nolint
+		verificationKey, _ = hex.DecodeString("3e9d3a6f792c9820ab4423e41256e4b6e2ae1f456318f9d936fc70e0eafdc76f")                                                                                                                                           // nolint
+		witnessCbor, _     = hex.DecodeString("8258203e9d3a6f792c9820ab4423e41256e4b6e2ae1f456318f9d936fc70e0eafdc76f58402992d7fbc6fb155b7cc83223c80bf9b0ddbfe24ff260600897a06e8050f6596a76defeea6a86048605f8f7c27ef53da318aa02838532ea1876aac876b2491a01") // nolint
+		txHashBytes, _     = hex.DecodeString(txHash)                                                                                                                                                                                                       // noline
+	)
+
+	signature, vKeyWitness, err := TxWitnessRaw(witnessCbor).GetSignatureAndVKey()
+	require.NoError(t, err)
+
+	require.NoError(t, err)
+	assert.Equal(t, verificationKey, vKeyWitness)
+
+	assert.Equal(t, signature, SignMessage(signingKey, verificationKey, txHashBytes))
+
+	dummySignature := SignMessage(signingKey, verificationKey, append([]byte{255}, txHash[1:]...))
+
+	dummyWitness, err := cbor.Marshal([][]byte{verificationKey, dummySignature})
+	require.NoError(t, err)
+
+	assert.NoError(t, VerifyWitness(txHash, witnessCbor))
+	assert.ErrorIs(t, VerifyWitness(strings.Replace(txHash, "7e", "7f", 1), witnessCbor), ErrInvalidWitness)
+	assert.ErrorIs(t, VerifyWitness(txHash, dummyWitness), ErrInvalidWitness)
 }

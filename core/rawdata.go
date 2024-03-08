@@ -3,6 +3,8 @@ package core
 import (
 	"encoding/hex"
 	"encoding/json"
+
+	"github.com/fxamacker/cbor/v2"
 )
 
 var (
@@ -68,7 +70,7 @@ func (tx TransactionWitnessedRaw) ToJSON() ([]byte, error) {
 
 type TxWitnessRaw []byte // cbor slice of bytes
 
-func NewWitnessRawFromJson(bytes []byte) (TxWitnessRaw, error) {
+func NewTxWitnessRawFromJson(bytes []byte) (TxWitnessRaw, error) {
 	var data map[string]interface{}
 
 	if err := json.Unmarshal(bytes, &data); err != nil {
@@ -90,4 +92,14 @@ func (w TxWitnessRaw) ToJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(mp)
+}
+
+func (w TxWitnessRaw) GetSignatureAndVKey() ([]byte, []byte, error) {
+	var signatureWitness [][]byte // Use the appropriate type for your CBOR structure
+
+	if err := cbor.Unmarshal(w, &signatureWitness); err != nil {
+		return nil, nil, err
+	}
+
+	return signatureWitness[1], signatureWitness[0], nil
 }

@@ -283,7 +283,7 @@ func (b *TxBuilder) AddWitness(tx []byte, wallet ISigningKeyRetriver) ([]byte, e
 		return nil, err
 	}
 
-	return NewWitnessRawFromJson(bytes)
+	return NewTxWitnessRawFromJson(bytes)
 }
 
 func (b *TxBuilder) AssembleWitnesses(tx []byte, witnesses [][]byte) ([]byte, error) {

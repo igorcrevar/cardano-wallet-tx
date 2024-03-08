@@ -9,6 +9,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/igorcrevar/cardano-wallet-tx/core"
 	cardanowallet "github.com/igorcrevar/cardano-wallet-tx/core"
 )
 
@@ -16,8 +17,9 @@ const (
 	socketPath              = "/home/bbs/Apps/card/node.socket"
 	testNetMagic            = uint(2)
 	blockfrostUrl           = "https://cardano-preview.blockfrost.io/api/v0"
-	blockfrostProjectApiKey = "preview7mGSjpyEKb24OxQ4cCxomxZ5axMs5PvE"
+	blockfrostProjectApiKey = ""
 	potentialFee            = uint64(300_000)
+	providerName            = "blockfrost"
 )
 
 func getKeyHashes(wallets []cardanowallet.IWallet) []string {
@@ -210,10 +212,19 @@ func createMultiSigTx(
 		return nil, "", err
 	}
 
+	txHash, err := builder.GetTxHash(txRaw)
+	if err != nil {
+		return nil, "", err
+	}
+
 	witnesses := make([][]byte, len(signers)+len(feeSigners))
 	for i, w := range signers {
 		witnesses[i], err = builder.AddWitness(txRaw, w)
 		if err != nil {
+			return nil, "", err
+		}
+
+		if err := core.VerifyWitness(txHash, witnesses[i]); err != nil {
 			return nil, "", err
 		}
 	}
@@ -223,6 +234,10 @@ func createMultiSigTx(
 		if err != nil {
 			return nil, "", err
 		}
+
+		if err := core.VerifyWitness(txHash, witnesses[i+len(signers)]); err != nil {
+			return nil, "", err
+		}
 	}
 
 	txSigned, err := builder.AssembleWitnesses(txRaw, witnesses)
@@ -230,12 +245,7 @@ func createMultiSigTx(
 		return nil, "", err
 	}
 
-	hash, err := builder.GetTxHash(txRaw)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return txSigned, hash, nil
+	return txSigned, txHash, nil
 }
 
 func createProvider(name string) (cardanowallet.ITxProvider, error) {
@@ -268,7 +278,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	txProviderBF, err := createProvider("blockfrost")
+	txProviderBF, err := createProvider(providerName)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)

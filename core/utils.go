@@ -2,7 +2,10 @@ package core
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -19,6 +22,8 @@ const (
 	AddressTypeAnyTest    AddressType = "test"
 	AddressTypeAnyMainnet AddressType = "mainnet"
 )
+
+var ErrInvalidWitness = errors.New("invalid witness")
 
 type AddressInfo struct {
 	Address  string      `json:"address"`
@@ -66,6 +71,7 @@ func GetAddressInfo(address string, addressType AddressType) AddressInfo {
 	return ai
 }
 
+// WaitForTransaction waits for transaction to be included in block
 func WaitForTransaction(ctx context.Context, txRetriever ITxRetriever,
 	hash string, numRetries int, waitTime time.Duration) (map[string]interface{}, error) {
 	for count := 0; count < numRetries; count++ {
@@ -84,4 +90,38 @@ func WaitForTransaction(ctx context.Context, txRetriever ITxRetriever,
 	}
 
 	return nil, fmt.Errorf("timeout while waiting for transaction %s to be processed", hash)
+}
+
+// VerifyWitness verifies if txHash is signed by witness
+func VerifyWitness(txHash string, witness []byte) error {
+	txHashBytes, err := hex.DecodeString(txHash)
+	if err != nil {
+		return err
+	}
+
+	signature, vKey, err := TxWitnessRaw(witness).GetSignatureAndVKey()
+	if err != nil {
+		return err
+	}
+
+	return VerifyMessage(txHashBytes, vKey, signature)
+}
+
+// Sign signs message. This method can panic, use with caution!
+func SignMessage(signingKey, verificationKey, message []byte) []byte {
+	privateKey := make([]byte, len(signingKey)+len(verificationKey))
+
+	copy(privateKey, signingKey)
+	copy(privateKey[32:], verificationKey)
+
+	return ed25519.Sign(privateKey, message)
+}
+
+// VerifyMessage verifies message with verificationKey and signature
+func VerifyMessage(message, verificationKey, signature []byte) error {
+	if !ed25519.Verify(verificationKey, message, signature) {
+		return ErrInvalidWitness
+	}
+
+	return nil
 }
