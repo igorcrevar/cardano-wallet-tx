@@ -59,12 +59,13 @@ func TestIsValidCardanoAddress(t *testing.T) {
 
 func TestVerifyWitness(t *testing.T) {
 	var (
-		txHash             = "7e8b59e41d2ba71888272a14cff401268fa01dceb19014f5dda7763334b8f221"
-		signingKey, _      = hex.DecodeString("1217236ac24d8ac12684b308cf9468f68ef5283096896dc1c5c3caf8351e2847")                                                                                                                                           // nolint
-		verificationKey, _ = hex.DecodeString("3e9d3a6f792c9820ab4423e41256e4b6e2ae1f456318f9d936fc70e0eafdc76f")                                                                                                                                           // nolint
-		witnessCbor, _     = hex.DecodeString("8258203e9d3a6f792c9820ab4423e41256e4b6e2ae1f456318f9d936fc70e0eafdc76f58402992d7fbc6fb155b7cc83223c80bf9b0ddbfe24ff260600897a06e8050f6596a76defeea6a86048605f8f7c27ef53da318aa02838532ea1876aac876b2491a01") // nolint
-		txHashBytes, _     = hex.DecodeString(txHash)                                                                                                                                                                                                       // noline
+		txHash         = "7e8b59e41d2ba71888272a14cff401268fa01dceb19014f5dda7763334b8f221"
+		signingKey, _  = hex.DecodeString("1217236ac24d8ac12684b308cf9468f68ef5283096896dc1c5c3caf8351e2847")                                                                                                                                           // nolint
+		witnessCbor, _ = hex.DecodeString("8258203e9d3a6f792c9820ab4423e41256e4b6e2ae1f456318f9d936fc70e0eafdc76f58402992d7fbc6fb155b7cc83223c80bf9b0ddbfe24ff260600897a06e8050f6596a76defeea6a86048605f8f7c27ef53da318aa02838532ea1876aac876b2491a01") // nolint
+		txHashBytes, _ = hex.DecodeString(txHash)                                                                                                                                                                                                       // noline
 	)
+
+	verificationKey := GetVerificationKeyFromSigningKey(signingKey)
 
 	signature, vKeyWitness, err := TxWitnessRaw(witnessCbor).GetSignatureAndVKey()
 	require.NoError(t, err)
@@ -72,9 +73,12 @@ func TestVerifyWitness(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, verificationKey, vKeyWitness)
 
-	assert.Equal(t, signature, SignMessage(signingKey, verificationKey, txHashBytes))
+	signedMessageCbor, err := SignMessage(signingKey, verificationKey, txHashBytes)
+	require.NoError(t, err)
+	assert.Equal(t, signature, signedMessageCbor)
 
-	dummySignature := SignMessage(signingKey, verificationKey, append([]byte{255}, txHash[1:]...))
+	dummySignature, err := SignMessage(signingKey, verificationKey, append([]byte{255}, txHash[1:]...))
+	require.NoError(t, err)
 
 	dummyWitness, err := cbor.Marshal([][]byte{verificationKey, dummySignature})
 	require.NoError(t, err)

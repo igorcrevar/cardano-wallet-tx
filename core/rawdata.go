@@ -33,13 +33,11 @@ func NewTransactionUnwitnessedRawFromJson(bytes []byte) (TransactionUnwitnessedR
 }
 
 func (tx TransactionUnwitnessedRaw) ToJSON() ([]byte, error) {
-	mp := map[string]interface{}{
+	return json.Marshal(map[string]interface{}{
 		"type":        txUnwitnessedJsonType,
 		"description": txUnwitnessedJsonDesc,
 		"cborHex":     hex.EncodeToString(tx),
-	}
-
-	return json.Marshal(mp)
+	})
 }
 
 type TransactionWitnessedRaw []byte
@@ -59,43 +57,25 @@ func NewTransactionWitnessedRawFromJson(bytes []byte) (TransactionWitnessedRaw, 
 }
 
 func (tx TransactionWitnessedRaw) ToJSON() ([]byte, error) {
-	mp := map[string]interface{}{
+	return json.Marshal(map[string]interface{}{
 		"type":        txWitnessedJsonType,
 		"description": txWitnessedJsonDesc,
 		"cborHex":     hex.EncodeToString(tx),
-	}
-
-	return json.Marshal(mp)
+	})
 }
 
 type TxWitnessRaw []byte // cbor slice of bytes
 
-func NewTxWitnessRawFromJson(bytes []byte) (TxWitnessRaw, error) {
-	var data map[string]interface{}
-
-	if err := json.Unmarshal(bytes, &data); err != nil {
-		return nil, err
-	}
-
-	// a little hack so we have always correct witness key and description for json (cardano-cli can return error otherwise)
-	witnessJsonType = data["type"].(string)
-	witnessJsonDesc = data["description"].(string)
-
-	return hex.DecodeString(data["cborHex"].(string))
-}
-
 func (w TxWitnessRaw) ToJSON() ([]byte, error) {
-	mp := map[string]interface{}{
+	return json.Marshal(map[string]interface{}{
 		"type":        witnessJsonType,
 		"description": witnessJsonDesc,
 		"cborHex":     hex.EncodeToString(w),
-	}
-
-	return json.Marshal(mp)
+	})
 }
 
 func (w TxWitnessRaw) GetSignatureAndVKey() ([]byte, []byte, error) {
-	var signatureWitness [][]byte // Use the appropriate type for your CBOR structure
+	var signatureWitness [2][]byte // Use the appropriate type for your CBOR structure
 
 	if err := cbor.Unmarshal(w, &signatureWitness); err != nil {
 		return nil, nil, err

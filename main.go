@@ -101,22 +101,17 @@ func createTx(txProvider cardanowallet.ITxProvider,
 
 	builder.UpdateOutputAmount(-1, inputs.Sum-outputsSum-fee)
 
-	txRaw, err := builder.Build()
+	txRaw, txHash, err := builder.Build()
 	if err != nil {
 		return nil, "", err
 	}
 
-	txSigned, err := builder.Sign(txRaw, []cardanowallet.ISigningKeyRetriver{wallet})
+	txSigned, err := core.SignTx(txRaw, txHash, wallet)
 	if err != nil {
 		return nil, "", err
 	}
 
-	hash, err := builder.GetTxHash(txRaw)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return txSigned, hash, nil
+	return txSigned, txHash, nil
 }
 
 func createMultiSigTx(
@@ -207,19 +202,14 @@ func createMultiSigTx(
 	builder.UpdateOutputAmount(-2, multiSigInputs.Sum-outputsSum)
 	builder.UpdateOutputAmount(-1, multiSigFeeInputs.Sum-fee)
 
-	txRaw, err := builder.Build()
-	if err != nil {
-		return nil, "", err
-	}
-
-	txHash, err := builder.GetTxHash(txRaw)
+	txRaw, txHash, err := builder.Build()
 	if err != nil {
 		return nil, "", err
 	}
 
 	witnesses := make([][]byte, len(signers)+len(feeSigners))
 	for i, w := range signers {
-		witnesses[i], err = builder.AddWitness(txRaw, w)
+		witnesses[i], err = core.CreateTxWitness(txHash, w)
 		if err != nil {
 			return nil, "", err
 		}
@@ -230,7 +220,7 @@ func createMultiSigTx(
 	}
 
 	for i, w := range feeSigners {
-		witnesses[i+len(signers)], err = builder.AddWitness(txRaw, w)
+		witnesses[i+len(signers)], err = core.CreateTxWitness(txHash, w)
 		if err != nil {
 			return nil, "", err
 		}
@@ -240,7 +230,7 @@ func createMultiSigTx(
 		}
 	}
 
-	txSigned, err := builder.AssembleWitnesses(txRaw, witnesses)
+	txSigned, err := core.AssembleTxWitnesses(txRaw, witnesses)
 	if err != nil {
 		return nil, "", err
 	}

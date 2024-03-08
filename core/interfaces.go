@@ -31,14 +31,14 @@ type ITxProvider interface {
 	Dispose()
 }
 
-type ISigningKeyRetriver interface {
+type ISigner interface {
 	GetSigningKey() []byte
+	GetVerificationKey() []byte
 }
 
 type IWallet interface {
-	ISigningKeyRetriver
+	ISigner
 	GetAddress() string
-	GetVerificationKey() []byte
 	GetKeyHash() string
 }
 

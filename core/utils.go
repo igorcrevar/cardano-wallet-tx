@@ -108,20 +108,38 @@ func VerifyWitness(txHash string, witness []byte) error {
 }
 
 // Sign signs message. This method can panic, use with caution!
-func SignMessage(signingKey, verificationKey, message []byte) []byte {
+func SignMessage(signingKey, verificationKey, message []byte) (result []byte, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("error: %v", r)
+		}
+	}()
+
 	privateKey := make([]byte, len(signingKey)+len(verificationKey))
 
 	copy(privateKey, signingKey)
 	copy(privateKey[32:], verificationKey)
 
-	return ed25519.Sign(privateKey, message)
+	result = ed25519.Sign(privateKey, message)
+
+	return
 }
 
 // VerifyMessage verifies message with verificationKey and signature
-func VerifyMessage(message, verificationKey, signature []byte) error {
+func VerifyMessage(message, verificationKey, signature []byte) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("error: %v", r)
+		}
+	}()
+
 	if !ed25519.Verify(verificationKey, message, signature) {
-		return ErrInvalidWitness
+		err = ErrInvalidWitness
 	}
 
-	return nil
+	return
+}
+
+func GetVerificationKeyFromSigningKey(signingKey []byte) []byte {
+	return ed25519.NewKeyFromSeed(signingKey).Public().(ed25519.PublicKey)
 }

@@ -1,12 +1,15 @@
 package core
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+
+	"github.com/fxamacker/cbor/v2"
 )
 
 const (
@@ -187,175 +190,36 @@ func (b *TxBuilder) CalculateFee(witnessCount int) (uint64, error) {
 	return strconv.ParseUint(strings.Split(feeOutput, " ")[0], 10, 64)
 }
 
-func (b *TxBuilder) Build() ([]byte, error) {
+func (b *TxBuilder) Build() ([]byte, string, error) {
 	if b.protocolParameters == nil {
-		return nil, errors.New("protocol parameters not set")
+		return nil, "", errors.New("protocol parameters not set")
 	}
 
 	protocolParamsFilePath := path.Join(b.baseDirectory, "protocol-parameters.json")
 	if err := os.WriteFile(protocolParamsFilePath, b.protocolParameters, 0755); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	if err := b.buildRawTx(protocolParamsFilePath, b.fee); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	bytes, err := os.ReadFile(path.Join(b.baseDirectory, draftTxFile))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return NewTransactionUnwitnessedRawFromJson(bytes)
-}
-
-func (b *TxBuilder) Sign(tx []byte, wallets []ISigningKeyRetriver) ([]byte, error) {
-	outFilePath := path.Join(b.baseDirectory, "tx.sig")
-	txFilePath := path.Join(b.baseDirectory, "tx.raw")
-
-	txBytes, err := TransactionUnwitnessedRaw(tx).ToJSON()
+	txRaw, err := NewTransactionUnwitnessedRawFromJson(bytes)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	if err := os.WriteFile(txFilePath, txBytes, 0755); err != nil {
-		return nil, err
-	}
-
-	args := append([]string{
-		"transaction", "sign",
-		"--tx-body-file", txFilePath,
-		"--out-file", outFilePath},
-		getTestNetMagicArgs(b.testNetMagic)...)
-
-	for i, wallet := range wallets {
-		signingKeyPath := path.Join(b.baseDirectory, fmt.Sprintf("tx_%d.skey", i))
-		if err := SaveKeyBytesToFile(wallet.GetSigningKey(), signingKeyPath, true, false); err != nil {
-			return nil, err
-		}
-
-		args = append(args, "--signing-key-file", signingKeyPath)
-	}
-
-	if _, err = runCommand(resolveCardanoCliBinary(), args); err != nil {
-		return nil, err
-	}
-
-	bytes, err := os.ReadFile(outFilePath)
+	txHash, err := getTxHash(txRaw, b.baseDirectory)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return NewTransactionWitnessedRawFromJson(bytes)
-}
-
-func (b *TxBuilder) AddWitness(tx []byte, wallet ISigningKeyRetriver) ([]byte, error) {
-	outFilePath := path.Join(b.baseDirectory, "tx.wit")
-	txFilePath := path.Join(b.baseDirectory, "tx.raw")
-	signingKeyPath := path.Join(b.baseDirectory, "tx.skey")
-
-	txBytes, err := TransactionUnwitnessedRaw(tx).ToJSON()
-	if err != nil {
-		return nil, err
-	}
-
-	if err := os.WriteFile(txFilePath, txBytes, 0755); err != nil {
-		return nil, err
-	}
-
-	if err := SaveKeyBytesToFile(wallet.GetSigningKey(), signingKeyPath, true, false); err != nil {
-		return nil, err
-	}
-
-	args := append([]string{
-		"transaction", "witness",
-		"--signing-key-file", signingKeyPath,
-		"--tx-body-file", txFilePath,
-		"--out-file", outFilePath},
-		getTestNetMagicArgs(b.testNetMagic)...)
-
-	if _, err = runCommand(resolveCardanoCliBinary(), args); err != nil {
-		return nil, err
-	}
-
-	bytes, err := os.ReadFile(outFilePath)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewTxWitnessRawFromJson(bytes)
-}
-
-func (b *TxBuilder) AssembleWitnesses(tx []byte, witnesses [][]byte) ([]byte, error) {
-	outFilePath := path.Join(b.baseDirectory, "tx.sig")
-	txFilePath := path.Join(b.baseDirectory, "tx.raw")
-	witnessesFilePaths := make([]string, len(witnesses))
-
-	for i, witness := range witnesses {
-		witnessesFilePaths[i] = path.Join(b.baseDirectory, fmt.Sprintf("witness-%d", i+1))
-
-		content, err := TxWitnessRaw(witness).ToJSON()
-		if err != nil {
-			return nil, err
-		}
-
-		if err := os.WriteFile(witnessesFilePaths[i], content, 0755); err != nil {
-			return nil, err
-		}
-	}
-
-	txBytes, err := TransactionUnwitnessedRaw(tx).ToJSON()
-	if err != nil {
-		return nil, err
-	}
-
-	if err := os.WriteFile(txFilePath, txBytes, 0755); err != nil {
-		return nil, err
-	}
-
-	args := []string{
-		"transaction", "assemble",
-		"--tx-body-file", txFilePath,
-		"--out-file", outFilePath}
-
-	for _, fp := range witnessesFilePaths {
-		args = append(args, "--witness-file", fp)
-	}
-
-	if _, err = runCommand(resolveCardanoCliBinary(), args); err != nil {
-		return nil, err
-	}
-
-	bytes, err := os.ReadFile(outFilePath)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewTransactionWitnessedRawFromJson(bytes)
-}
-
-func (b *TxBuilder) GetTxHash(tx []byte) (string, error) {
-	txFilePath := path.Join(b.baseDirectory, "tx.tmp")
-
-	txBytes, err := TransactionUnwitnessedRaw(tx).ToJSON()
-	if err != nil {
-		return "", err
-	}
-
-	if err := os.WriteFile(txFilePath, txBytes, 0755); err != nil {
-		return "", err
-	}
-
-	args := []string{
-		"transaction", "txid",
-		"--tx-body-file", txFilePath}
-
-	res, err := runCommand(resolveCardanoCliBinary(), args)
-	if err != nil {
-		return "", err
-	}
-
-	return strings.Trim(res, "\n"), err
+	return txRaw, txHash, nil
 }
 
 func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error {
@@ -399,4 +263,130 @@ func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error 
 
 	_, err := runCommand(resolveCardanoCliBinary(), args)
 	return err
+}
+
+// SignTx creates witness and assembles it to final tx
+func SignTx(txRaw []byte, txHash string, wallet ISigner) ([]byte, error) {
+	witness, err := CreateTxWitness(txHash, wallet)
+	if err != nil {
+		return nil, err
+	}
+
+	return AssembleTxWitnesses(txRaw, [][]byte{witness})
+}
+
+// CreateTxWitness signs transaction hash and creates witness cbor
+func CreateTxWitness(txHash string, wallet ISigner) ([]byte, error) {
+	txHashBytes, err := hex.DecodeString(txHash)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := SignMessage(wallet.GetSigningKey(), wallet.GetVerificationKey(), txHashBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return cbor.Marshal([][]byte{
+		wallet.GetVerificationKey(),
+		result,
+	})
+}
+
+// AssembleTxWitnesses assembles final signed transaction
+func AssembleTxWitnesses(txRaw []byte, witnesses [][]byte) ([]byte, error) {
+	baseDirectory, err := os.MkdirTemp("", "assemble-txs")
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		os.RemoveAll(baseDirectory)
+		os.Remove(baseDirectory)
+	}()
+
+	outFilePath := path.Join(baseDirectory, "tx.sig")
+	txFilePath := path.Join(baseDirectory, "tx.raw")
+	witnessesFilePaths := make([]string, len(witnesses))
+
+	for i, witness := range witnesses {
+		witnessesFilePaths[i] = path.Join(baseDirectory, fmt.Sprintf("witness-%d", i+1))
+
+		content, err := TxWitnessRaw(witness).ToJSON()
+		if err != nil {
+			return nil, err
+		}
+
+		if err := os.WriteFile(witnessesFilePaths[i], content, 0755); err != nil {
+			return nil, err
+		}
+	}
+
+	txBytes, err := TransactionUnwitnessedRaw(txRaw).ToJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := os.WriteFile(txFilePath, txBytes, 0755); err != nil {
+		return nil, err
+	}
+
+	args := []string{
+		"transaction", "assemble",
+		"--tx-body-file", txFilePath,
+		"--out-file", outFilePath}
+
+	for _, fp := range witnessesFilePaths {
+		args = append(args, "--witness-file", fp)
+	}
+
+	if _, err = runCommand(resolveCardanoCliBinary(), args); err != nil {
+		return nil, err
+	}
+
+	bytes, err := os.ReadFile(outFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewTransactionWitnessedRawFromJson(bytes)
+}
+
+// GetTxHash gets hash from transaction cbor slice
+func GetTxHash(txRaw []byte) (string, error) {
+	baseDirectory, err := os.MkdirTemp("", "get-txhash")
+	if err != nil {
+		return "", err
+	}
+
+	defer func() {
+		os.RemoveAll(baseDirectory)
+		os.Remove(baseDirectory)
+	}()
+
+	return getTxHash(txRaw, baseDirectory)
+}
+
+func getTxHash(txRaw []byte, baseDirectory string) (string, error) {
+	txFilePath := path.Join(baseDirectory, "tx.tmp")
+
+	txBytes, err := TransactionUnwitnessedRaw(txRaw).ToJSON()
+	if err != nil {
+		return "", err
+	}
+
+	if err := os.WriteFile(txFilePath, txBytes, 0755); err != nil {
+		return "", err
+	}
+
+	args := []string{
+		"transaction", "txid",
+		"--tx-body-file", txFilePath}
+
+	res, err := runCommand(resolveCardanoCliBinary(), args)
+	if err != nil {
+		return "", err
+	}
+
+	return strings.Trim(res, "\n"), err
 }
