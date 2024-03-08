@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"os/exec"
+	"strconv"
 )
 
 type runCommandError struct {
@@ -52,4 +53,12 @@ func runCommand(binary string, args []string, envVariables ...string) (string, e
 func isFileOrDirExists(fileOrDirPath string) bool {
 	_, err := os.Stat(fileOrDirPath)
 	return err == nil || !os.IsNotExist(err)
+}
+
+func getTestNetMagicArgs(testnetMagic uint) []string {
+	if testnetMagic == 0 {
+		return []string{"--mainnet"}
+	}
+
+	return []string{"--testnet-magic", strconv.FormatUint(uint64(testnetMagic), 10)}
 }

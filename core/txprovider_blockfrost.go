@@ -2,15 +2,12 @@ package core
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
-
-	"github.com/fxamacker/cbor/v2"
 )
 
 type TxProviderBlockFrost struct {
@@ -149,30 +146,9 @@ func (b *TxProviderBlockFrost) GetSlot() (uint64, error) {
 	return uint64(responseData["slot"].(float64)), nil
 }
 
-func (b *TxProviderBlockFrost) SubmitTx(tx []byte) error {
-	if bytes.Contains(tx, []byte("cborHex")) {
-		var responseData map[string]interface{}
-		if err := json.Unmarshal(tx, &responseData); err != nil {
-			return err
-		}
-
-		bytes, err := hex.DecodeString(responseData["cborHex"].(string))
-		if err != nil {
-			return err
-		}
-
-		tx = bytes
-	} else {
-		serializedTxBor, err := cbor.Marshal(tx)
-		if err != nil {
-			return err
-		}
-
-		tx = serializedTxBor
-	}
-
+func (b *TxProviderBlockFrost) SubmitTx(txSigned []byte) error {
 	// Create a request with the JSON payload
-	req, err := http.NewRequest("POST", b.url+"/tx/submit", bytes.NewBuffer(tx))
+	req, err := http.NewRequest("POST", b.url+"/tx/submit", bytes.NewBuffer(txSigned))
 	if err != nil {
 		return err
 	}

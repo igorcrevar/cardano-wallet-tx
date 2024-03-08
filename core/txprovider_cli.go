@@ -127,10 +127,15 @@ func (b *TxProviderCli) GetSlot() (uint64, error) {
 	return legder.Slot, nil
 }
 
-func (b *TxProviderCli) SubmitTx(tx []byte) error {
+func (b *TxProviderCli) SubmitTx(txSigned []byte) error {
 	txFilePath := path.Join(b.baseDirectory, "tx.send")
 
-	if err := os.WriteFile(txFilePath, tx, 0755); err != nil {
+	txBytes, err := TransactionWitnessedRaw(txSigned).ToJSON()
+	if err != nil {
+		return err
+	}
+
+	if err := os.WriteFile(txFilePath, txBytes, 0755); err != nil {
 		return err
 	}
 

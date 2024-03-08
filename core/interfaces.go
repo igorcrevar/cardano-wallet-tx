@@ -7,7 +7,8 @@ type Utxo struct {
 }
 
 type ITxSubmitter interface {
-	SubmitTx(tx []byte) error
+	// SubmitTx submits transaction - txSigned should be cbor serialized signed transaction
+	SubmitTx(txSigned []byte) error
 }
 
 type ITxRetriever interface {
