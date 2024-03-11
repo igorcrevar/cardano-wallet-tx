@@ -9,7 +9,6 @@ import (
 	"path"
 	"time"
 
-	"github.com/igorcrevar/cardano-wallet-tx/core"
 	cardanowallet "github.com/igorcrevar/cardano-wallet-tx/core"
 )
 
@@ -35,9 +34,9 @@ func createWallets(walletBuilder cardanowallet.IWalletBuilder, keyDirectory stri
 	wallets := make([]cardanowallet.IWallet, cnt)
 
 	for i := 0; i < cnt; i++ {
-		suffix := fmt.Sprintf("%d", i+1)
+		fpath := fmt.Sprintf("%s%d", keyDirectory, i+1)
 
-		wallet, err := walletBuilder.Create(path.Join(keyDirectory, suffix), false)
+		wallet, err := walletBuilder.Create(fpath, false)
 		if err != nil {
 			return nil, err
 		}
@@ -106,7 +105,7 @@ func createTx(txProvider cardanowallet.ITxProvider,
 		return nil, "", err
 	}
 
-	txSigned, err := core.SignTx(txRaw, txHash, wallet)
+	txSigned, err := cardanowallet.SignTx(txRaw, txHash, wallet)
 	if err != nil {
 		return nil, "", err
 	}
@@ -209,28 +208,28 @@ func createMultiSigTx(
 
 	witnesses := make([][]byte, len(signers)+len(feeSigners))
 	for i, w := range signers {
-		witnesses[i], err = core.CreateTxWitness(txHash, w)
+		witnesses[i], err = cardanowallet.CreateTxWitness(txHash, w)
 		if err != nil {
 			return nil, "", err
 		}
 
-		if err := core.VerifyWitness(txHash, witnesses[i]); err != nil {
+		if err := cardanowallet.VerifyWitness(txHash, witnesses[i]); err != nil {
 			return nil, "", err
 		}
 	}
 
 	for i, w := range feeSigners {
-		witnesses[i+len(signers)], err = core.CreateTxWitness(txHash, w)
+		witnesses[i+len(signers)], err = cardanowallet.CreateTxWitness(txHash, w)
 		if err != nil {
 			return nil, "", err
 		}
 
-		if err := core.VerifyWitness(txHash, witnesses[i+len(signers)]); err != nil {
+		if err := cardanowallet.VerifyWitness(txHash, witnesses[i+len(signers)]); err != nil {
 			return nil, "", err
 		}
 	}
 
-	txSigned, err := core.AssembleTxWitnesses(txRaw, witnesses)
+	txSigned, err := cardanowallet.AssembleTxWitnesses(txRaw, witnesses)
 	if err != nil {
 		return nil, "", err
 	}
@@ -262,7 +261,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	wallets, err := createWallets(createWalletBuilder(true), path.Join(currentUser.HomeDir, "cardano_wallet_stake_"), 6)
+	wallets, err := createWallets(createWalletBuilder(true), path.Join(currentUser.HomeDir, "cardano", "wallet_stake_"), 6)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)

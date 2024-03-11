@@ -3,7 +3,6 @@ package core
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -46,7 +45,7 @@ func (b *TxProviderBlockFrost) GetProtocolParameters() ([]byte, error) {
 
 	// Check the HTTP status code
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("status code is %d", resp.StatusCode)
+		return nil, getErrorFromResponse(resp)
 	}
 
 	bytes, err := io.ReadAll(resp.Body)
@@ -80,7 +79,7 @@ func (b *TxProviderBlockFrost) GetUtxos(addr string) ([]Utxo, error) {
 	if resp.StatusCode == http.StatusNotFound {
 		return []Utxo{}, nil // this address does not have any UTxOs
 	} else if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("status code is %d", resp.StatusCode)
+		return nil, getErrorFromResponse(resp)
 	}
 
 	var responseData []map[string]interface{}
@@ -135,7 +134,7 @@ func (b *TxProviderBlockFrost) GetSlot() (uint64, error) {
 
 	// Check the HTTP status code
 	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("status code is %d", resp.StatusCode)
+		return 0, getErrorFromResponse(resp)
 	}
 
 	var responseData map[string]interface{}
@@ -167,12 +166,7 @@ func (b *TxProviderBlockFrost) SubmitTx(txSigned []byte) error {
 
 	// Check the HTTP status code
 	if resp.StatusCode != http.StatusOK {
-		var responseData map[string]interface{}
-		if err = json.NewDecoder(resp.Body).Decode(&responseData); err != nil {
-			return fmt.Errorf("status code %d", resp.StatusCode)
-		}
-
-		return fmt.Errorf("status code %d: %s", resp.StatusCode, responseData["message"])
+		return getErrorFromResponse(resp)
 	}
 
 	return nil
@@ -196,17 +190,15 @@ func (b *TxProviderBlockFrost) GetTxByHash(hash string) (map[string]interface{},
 
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil // tx not included in block (yet)
+	} else if resp.StatusCode != http.StatusOK {
+		return nil, getErrorFromResponse(resp)
+	}
+
 	var responseData map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&responseData); err != nil {
 		return nil, err
-	}
-
-	if err := responseData["error"]; err != nil {
-		if err.(string) == "Not Found" {
-			return nil, nil
-		}
-
-		return nil, errors.New(responseData["message"].(string))
 	}
 
 	return responseData, nil
@@ -266,4 +258,13 @@ func convertProtocolParameters(bytes []byte) ([]byte, error) {
 	// TODO: "costModels": "PlutusV1" ...
 
 	return json.Marshal(resultJson)
+}
+
+func getErrorFromResponse(resp *http.Response) error {
+	var responseData map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&responseData); err != nil {
+		return fmt.Errorf("status code %d", resp.StatusCode)
+	}
+
+	return fmt.Errorf("status code %d: %s", resp.StatusCode, responseData["message"])
 }
