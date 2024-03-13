@@ -14,18 +14,15 @@ const (
 	stakeSigningKeyFile      = "stake.skey"
 )
 
-type WalletBuilder struct {
-	testNetMagic uint
+type WalletManager struct {
 }
 
-func NewWalletBuilder(testNetMagic uint) *WalletBuilder {
-	return &WalletBuilder{
-		testNetMagic: testNetMagic,
-	}
+func NewWalletManager() *WalletManager {
+	return &WalletManager{}
 }
 
-func (w *WalletBuilder) Create(directory string, forceCreate bool) (IWallet, error) {
-	dir := walletBuilderDirectory(directory)
+func (w *WalletManager) Create(directory string, forceCreate bool) (IWallet, error) {
+	dir := walletManagerDirectory(directory)
 
 	if !forceCreate && dir.ArePaymentFilesExist() {
 		return w.Load(directory)
@@ -47,8 +44,8 @@ func (w *WalletBuilder) Create(directory string, forceCreate bool) (IWallet, err
 	return w.Load(directory)
 }
 
-func (w *WalletBuilder) Load(directory string) (*Wallet, error) {
-	dir := walletBuilderDirectory(directory)
+func (w *WalletManager) Load(directory string) (IWallet, error) {
+	dir := walletManagerDirectory(directory)
 
 	verificationKeyBytes, err := getKeyBytes(dir.GetVerificationKeyPath())
 	if err != nil {
@@ -56,14 +53,6 @@ func (w *WalletBuilder) Load(directory string) (*Wallet, error) {
 	}
 
 	signingKeyBytes, err := getKeyBytes(dir.GetSigningKeyPath())
-	if err != nil {
-		return nil, err
-	}
-
-	resultAddress, err := runCommand(resolveCardanoCliBinary(), append([]string{
-		"address", "build",
-		"--payment-verification-key-file", dir.GetVerificationKeyPath(),
-	}, getTestNetMagicArgs(w.testNetMagic)...))
 	if err != nil {
 		return nil, err
 	}
@@ -76,24 +65,20 @@ func (w *WalletBuilder) Load(directory string) (*Wallet, error) {
 		return nil, err
 	}
 
-	address := strings.Trim(resultAddress, "\n")
 	keyHash := strings.Trim(resultKeyHash, "\n")
 
-	return NewWallet(address, verificationKeyBytes, signingKeyBytes, keyHash), nil
+	return NewWallet(verificationKeyBytes, signingKeyBytes, keyHash), nil
 }
 
-type StakeWalletBuilder struct {
-	testNetMagic uint
+type StakeWalletManager struct {
 }
 
-func NewStakeWalletBuilder(testNetMagic uint) *StakeWalletBuilder {
-	return &StakeWalletBuilder{
-		testNetMagic: testNetMagic,
-	}
+func NewStakeWalletManager() *StakeWalletManager {
+	return &StakeWalletManager{}
 }
 
-func (w *StakeWalletBuilder) Create(directory string, forceCreate bool) (IWallet, error) {
-	dir := walletBuilderDirectory(directory)
+func (w *StakeWalletManager) Create(directory string, forceCreate bool) (IWallet, error) {
+	dir := walletManagerDirectory(directory)
 
 	if !forceCreate && dir.ArePaymentFilesExist() {
 		if dir.AreStakeFilesExist() {
@@ -128,8 +113,8 @@ func (w *StakeWalletBuilder) Create(directory string, forceCreate bool) (IWallet
 	return w.Load(directory)
 }
 
-func (w *StakeWalletBuilder) Load(directory string) (*StakeWallet, error) {
-	dir := walletBuilderDirectory(directory)
+func (w *StakeWalletManager) Load(directory string) (IWallet, error) {
+	dir := walletManagerDirectory(directory)
 
 	verificationKeyBytes, err := getKeyBytes(dir.GetVerificationKeyPath())
 	if err != nil {
@@ -151,23 +136,6 @@ func (w *StakeWalletBuilder) Load(directory string) (*StakeWallet, error) {
 		return nil, err
 	}
 
-	resultAddress, err := runCommand(resolveCardanoCliBinary(), append([]string{
-		"address", "build",
-		"--payment-verification-key-file", dir.GetVerificationKeyPath(),
-		"--stake-verification-key-file", dir.GetStakeVerificationKeyPath(),
-	}, getTestNetMagicArgs(w.testNetMagic)...))
-	if err != nil {
-		return nil, err
-	}
-
-	resultStakeAddress, err := runCommand(resolveCardanoCliBinary(), append([]string{
-		"stake-address", "build",
-		"--stake-verification-key-file", dir.GetStakeVerificationKeyPath(),
-	}, getTestNetMagicArgs(w.testNetMagic)...))
-	if err != nil {
-		return nil, err
-	}
-
 	resultKeyHash, err := runCommand(resolveCardanoCliBinary(), []string{
 		"address", "key-hash",
 		"--payment-verification-key-file", dir.GetVerificationKeyPath(),
@@ -176,45 +144,91 @@ func (w *StakeWalletBuilder) Load(directory string) (*StakeWallet, error) {
 		return nil, err
 	}
 
-	address := strings.Trim(resultAddress, "\n")
-	stakeAddress := strings.Trim(resultStakeAddress, "\n")
 	keyHash := strings.Trim(resultKeyHash, "\n")
 
-	return NewStakeWallet(address, verificationKeyBytes, signingKeyBytes, keyHash,
-		stakeAddress, stakeVerificationKeyBytes, stakeSigningKeyBytes), nil
+	return NewStakeWallet(verificationKeyBytes, signingKeyBytes, keyHash,
+		stakeVerificationKeyBytes, stakeSigningKeyBytes), nil
 }
 
-type walletBuilderDirectory string
+type walletManagerDirectory string
 
-func (w walletBuilderDirectory) GetSigningKeyPath() string {
+func (w walletManagerDirectory) GetSigningKeyPath() string {
 	return path.Join(string(w), signingKeyFile)
 }
 
-func (w walletBuilderDirectory) GetVerificationKeyPath() string {
+func (w walletManagerDirectory) GetVerificationKeyPath() string {
 	return path.Join(string(w), verificationKeyFile)
 }
 
-func (w walletBuilderDirectory) GetStakeSigningKeyPath() string {
+func (w walletManagerDirectory) GetStakeSigningKeyPath() string {
 	return path.Join(string(w), stakeSigningKeyFile)
 }
 
-func (w walletBuilderDirectory) GetStakeVerificationKeyPath() string {
+func (w walletManagerDirectory) GetStakeVerificationKeyPath() string {
 	return path.Join(string(w), stakeVerificationKeyFile)
 }
 
-func (w walletBuilderDirectory) ArePaymentFilesExist() bool {
+func (w walletManagerDirectory) ArePaymentFilesExist() bool {
 	return isFileOrDirExists(w.GetVerificationKeyPath()) && isFileOrDirExists(w.GetSigningKeyPath())
 }
 
-func (w walletBuilderDirectory) AreStakeFilesExist() bool {
+func (w walletManagerDirectory) AreStakeFilesExist() bool {
 	return isFileOrDirExists(w.GetStakeVerificationKeyPath()) && isFileOrDirExists(w.GetStakeSigningKeyPath())
 }
 
-func (w walletBuilderDirectory) CreateDirectoryIfNotExists() error {
+func (w walletManagerDirectory) CreateDirectoryIfNotExists() error {
 	if _, err := os.Stat(string(w)); os.IsNotExist(err) {
 		// If the directory doesn't exist, create it
 		return os.MkdirAll(string(w), 0755)
 	}
 
 	return nil
+}
+
+// GetWalletAddress returns address and stake address for wallet (if wallet is stake wallet)
+func GetWalletAddress(wallet IWallet, testNetMagic uint) (addr string, stakeAddr string, err error) {
+	baseDirectory, err := os.MkdirTemp("", "get-address")
+	if err != nil {
+		return "", "", err
+	}
+
+	defer func() {
+		os.RemoveAll(baseDirectory)
+		os.Remove(baseDirectory)
+	}()
+
+	dir := walletManagerDirectory(baseDirectory)
+
+	err = SaveKeyBytesToFile(wallet.GetVerificationKey(), dir.GetVerificationKeyPath(), false, false)
+	if err != nil {
+		return "", "", nil
+	}
+
+	if len(wallet.GetStakeVerificationKey()) == 0 {
+		addr, err = runCommand(resolveCardanoCliBinary(), append([]string{
+			"address", "build",
+			"--payment-verification-key-file", dir.GetVerificationKeyPath(),
+		}, getTestNetMagicArgs(testNetMagic)...))
+	} else {
+		err = SaveKeyBytesToFile(wallet.GetStakeVerificationKey(), dir.GetStakeVerificationKeyPath(), false, true)
+		if err != nil {
+			return "", "", nil
+		}
+
+		addr, err = runCommand(resolveCardanoCliBinary(), append([]string{
+			"address", "build",
+			"--payment-verification-key-file", dir.GetVerificationKeyPath(),
+			"--stake-verification-key-file", dir.GetStakeVerificationKeyPath(),
+		}, getTestNetMagicArgs(testNetMagic)...))
+		if err != nil {
+			return "", "", err
+		}
+
+		stakeAddr, err = runCommand(resolveCardanoCliBinary(), append([]string{
+			"stake-address", "build",
+			"--stake-verification-key-file", dir.GetStakeVerificationKeyPath(),
+		}, getTestNetMagicArgs(testNetMagic)...))
+	}
+
+	return strings.Trim(addr, "\n"), strings.Trim(stakeAddr, "\n"), err
 }

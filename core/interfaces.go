@@ -36,14 +36,22 @@ type ISigner interface {
 	GetVerificationKey() []byte
 }
 
-type IWallet interface {
+type IStakeSigner interface {
 	ISigner
-	GetAddress() string
+	GetStakeSigningKey() []byte
+	GetStakeVerificationKey() []byte
+}
+
+type IWallet interface {
+	IStakeSigner
 	GetKeyHash() string
 }
 
-type IWalletBuilder interface {
+type IWalletManager interface {
+	// Create creates new wallet
 	Create(directory string, forceCreate bool) (IWallet, error)
+	// Load loads wallet
+	Load(directory string) (IWallet, error)
 }
 
 type IPolicyScript interface {

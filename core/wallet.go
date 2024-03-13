@@ -9,23 +9,30 @@ import (
 )
 
 type Wallet struct {
-	Address         string `json:"address"`
-	VerificationKey []byte `json:"verificationKey"`
-	SigningKey      []byte `json:"signingKey"`
-	KeyHash         string `json:"keyHash"`
+	VerificationKey      []byte `json:"verificationKey"`
+	SigningKey           []byte `json:"signingKey"`
+	KeyHash              string `json:"keyHash"`
+	StakeVerificationKey []byte `json:"stakeVerificationKey"`
+	StakeSigningKey      []byte `json:"stakeSigningKey"`
 }
 
-func NewWallet(address string, verificationKey []byte, signingKey []byte, keyHash string) *Wallet {
+func NewWallet(verificationKey []byte, signingKey []byte, keyHash string) *Wallet {
 	return &Wallet{
-		Address:         address,
 		VerificationKey: verificationKey,
 		SigningKey:      signingKey,
 		KeyHash:         keyHash,
 	}
 }
 
-func (w Wallet) GetAddress() string {
-	return w.Address
+func NewStakeWallet(verificationKey []byte, signingKey []byte, keyHash string,
+	stakeVerificationKey []byte, stakeSigningKey []byte) *Wallet {
+	return &Wallet{
+		StakeVerificationKey: stakeVerificationKey,
+		StakeSigningKey:      stakeSigningKey,
+		VerificationKey:      verificationKey,
+		SigningKey:           signingKey,
+		KeyHash:              keyHash,
+	}
 }
 
 func (w Wallet) GetVerificationKey() []byte {
@@ -40,32 +47,11 @@ func (w Wallet) GetKeyHash() string {
 	return w.KeyHash
 }
 
-type StakeWallet struct {
-	*Wallet
-	StakeAddress         string `json:"stakeAddress"`
-	StakeVerificationKey []byte `json:"stakeVerificationKey"`
-	StakeSigningKey      []byte `json:"stakeSigningKey"`
-}
-
-func NewStakeWallet(address string, verificationKey []byte, signingKey []byte, keyHash string,
-	stakeAddress string, stakeVerificationKey []byte, stakeSigningKey []byte) *StakeWallet {
-	return &StakeWallet{
-		StakeAddress:         stakeAddress,
-		StakeVerificationKey: stakeVerificationKey,
-		StakeSigningKey:      stakeSigningKey,
-		Wallet:               NewWallet(address, verificationKey, signingKey, keyHash),
-	}
-}
-
-func (w StakeWallet) GetStakeAddress() string {
-	return w.StakeAddress
-}
-
-func (w StakeWallet) GetStakeVerificationKey() []byte {
+func (w Wallet) GetStakeVerificationKey() []byte {
 	return w.StakeVerificationKey
 }
 
-func (w StakeWallet) GetStakeSigningKey() []byte {
+func (w Wallet) GetStakeSigningKey() []byte {
 	return w.StakeSigningKey
 }
 

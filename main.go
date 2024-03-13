@@ -30,13 +30,13 @@ func getKeyHashes(wallets []cardanowallet.IWallet) []string {
 	return keyHashes
 }
 
-func createWallets(walletBuilder cardanowallet.IWalletBuilder, keyDirectory string, cnt int) ([]cardanowallet.IWallet, error) {
+func createWallets(walletMngr cardanowallet.IWalletManager, keyDirectory string, cnt int) ([]cardanowallet.IWallet, error) {
 	wallets := make([]cardanowallet.IWallet, cnt)
 
 	for i := 0; i < cnt; i++ {
 		fpath := fmt.Sprintf("%s%d", keyDirectory, i+1)
 
-		wallet, err := walletBuilder.Create(fpath, false)
+		wallet, err := walletMngr.Create(fpath, false)
 		if err != nil {
 			return nil, err
 		}
@@ -49,7 +49,12 @@ func createWallets(walletBuilder cardanowallet.IWalletBuilder, keyDirectory stri
 
 func createTx(txProvider cardanowallet.ITxProvider,
 	wallet cardanowallet.IWallet, testNetMagic uint, potentialFee uint64) ([]byte, string, error) {
-	fmt.Println("address =", wallet.GetAddress())
+	address, _, err := cardanowallet.GetWalletAddress(wallet, testNetMagic)
+	if err != nil {
+		return nil, "", err
+	}
+
+	fmt.Println("address =", address)
 
 	metadata := map[string]interface{}{
 		"0": map[string]interface{}{
@@ -80,14 +85,14 @@ func createTx(txProvider cardanowallet.ITxProvider,
 		return nil, "", err
 	}
 
-	inputs, err := cardanowallet.GetUTXOsForAmount(txProvider, wallet.GetAddress(), outputsSum+potentialFee)
+	inputs, err := cardanowallet.GetUTXOsForAmount(txProvider, address, outputsSum+potentialFee)
 	if err != nil {
 		return nil, "", err
 	}
 
 	builder.SetMetaData(metadataBytes).SetTestNetMagic(testNetMagic)
 	builder.AddOutputs(outputs...).AddOutputs(cardanowallet.TxOutput{
-		Addr: wallet.GetAddress(),
+		Addr: address,
 	})
 	builder.AddInputs(inputs.Inputs...)
 
@@ -246,12 +251,12 @@ func createProvider(name string) (cardanowallet.ITxProvider, error) {
 	}
 }
 
-func createWalletBuilder(isStake bool) cardanowallet.IWalletBuilder {
+func createWalletMngr(isStake bool) cardanowallet.IWalletManager {
 	if isStake {
-		return cardanowallet.NewStakeWalletBuilder(testNetMagic)
+		return cardanowallet.NewStakeWalletManager()
 	}
 
-	return cardanowallet.NewWalletBuilder(testNetMagic)
+	return cardanowallet.NewWalletManager()
 }
 
 func main() {
@@ -261,7 +266,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	wallets, err := createWallets(createWalletBuilder(true), path.Join(currentUser.HomeDir, "cardano", "wallet_stake_"), 6)
+	wallets, err := createWallets(createWalletMngr(false), path.Join(currentUser.HomeDir, "cardano", "wallet_stake_"), 6)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
@@ -275,6 +280,8 @@ func main() {
 
 	defer txProviderBF.Dispose()
 
+	txRetriever := txProviderBF.(cardanowallet.ITxRetriever)
+
 	multiSigTx, multiSigTxHash, err := createMultiSigTx(txProviderBF, wallets[:3], wallets[3:], testNetMagic, potentialFee)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
@@ -285,8 +292,6 @@ func main() {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
-
-	txRetriever := txProviderBF.(cardanowallet.ITxRetriever)
 
 	txData, err := cardanowallet.WaitForTransaction(context.Background(), txRetriever, multiSigTxHash, 100, time.Second*2)
 	if err != nil {
