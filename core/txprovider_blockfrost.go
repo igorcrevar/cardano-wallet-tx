@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -24,9 +25,9 @@ func NewTxProviderBlockFrost(url string, projectID string) (*TxProviderBlockFros
 func (b *TxProviderBlockFrost) Dispose() {
 }
 
-func (b *TxProviderBlockFrost) GetProtocolParameters() ([]byte, error) {
+func (b *TxProviderBlockFrost) GetProtocolParameters(ctx context.Context) ([]byte, error) {
 	// Create a request with the JSON payload
-	req, err := http.NewRequest("GET", b.url+"/epochs/latest/parameters", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", b.url+"/epochs/latest/parameters", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -56,9 +57,9 @@ func (b *TxProviderBlockFrost) GetProtocolParameters() ([]byte, error) {
 	return convertProtocolParameters(bytes)
 }
 
-func (b *TxProviderBlockFrost) GetUtxos(addr string) ([]Utxo, error) {
+func (b *TxProviderBlockFrost) GetUtxos(ctx context.Context, addr string) ([]Utxo, error) {
 	// Create a request with the JSON payload
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/addresses/%s/utxos", b.url, addr), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/addresses/%s/utxos", b.url, addr), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -113,9 +114,9 @@ func (b *TxProviderBlockFrost) GetUtxos(addr string) ([]Utxo, error) {
 	return response, nil
 }
 
-func (b *TxProviderBlockFrost) GetSlot() (uint64, error) {
+func (b *TxProviderBlockFrost) GetSlot(ctx context.Context) (uint64, error) {
 	// Create a request with the JSON payload
-	req, err := http.NewRequest("GET", b.url+"/blocks/latest", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", b.url+"/blocks/latest", nil)
 	if err != nil {
 		return 0, err
 	}
@@ -145,9 +146,9 @@ func (b *TxProviderBlockFrost) GetSlot() (uint64, error) {
 	return uint64(responseData["slot"].(float64)), nil
 }
 
-func (b *TxProviderBlockFrost) SubmitTx(txSigned []byte) error {
+func (b *TxProviderBlockFrost) SubmitTx(ctx context.Context, txSigned []byte) error {
 	// Create a request with the JSON payload
-	req, err := http.NewRequest("POST", b.url+"/tx/submit", bytes.NewBuffer(txSigned))
+	req, err := http.NewRequestWithContext(ctx, "POST", b.url+"/tx/submit", bytes.NewBuffer(txSigned))
 	if err != nil {
 		return err
 	}
@@ -172,9 +173,9 @@ func (b *TxProviderBlockFrost) SubmitTx(txSigned []byte) error {
 	return nil
 }
 
-func (b *TxProviderBlockFrost) GetTxByHash(hash string) (map[string]interface{}, error) {
+func (b *TxProviderBlockFrost) GetTxByHash(ctx context.Context, hash string) (map[string]interface{}, error) {
 	// Create a request with the JSON payload
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/txs/%s", b.url, hash), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/txs/%s", b.url, hash), nil)
 	if err != nil {
 		return nil, err
 	}

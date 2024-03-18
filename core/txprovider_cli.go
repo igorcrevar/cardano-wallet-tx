@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -33,7 +34,7 @@ func (b *TxProviderCli) Dispose() {
 	os.Remove(b.baseDirectory)
 }
 
-func (b *TxProviderCli) GetProtocolParameters() ([]byte, error) {
+func (b *TxProviderCli) GetProtocolParameters(_ context.Context) ([]byte, error) {
 	args := append([]string{
 		"query", "protocol-parameters",
 		"--socket-path", b.socketPath,
@@ -47,7 +48,7 @@ func (b *TxProviderCli) GetProtocolParameters() ([]byte, error) {
 	return []byte(response), nil
 }
 
-func (b *TxProviderCli) GetUtxos(addr string) ([]Utxo, error) {
+func (b *TxProviderCli) GetUtxos(_ context.Context, addr string) ([]Utxo, error) {
 	args := append([]string{
 		"query", "utxo",
 		"--socket-path", b.socketPath,
@@ -98,7 +99,7 @@ func (b *TxProviderCli) GetUtxos(addr string) ([]Utxo, error) {
 	return inputs, nil
 }
 
-func (b *TxProviderCli) GetSlot() (uint64, error) {
+func (b *TxProviderCli) GetSlot(_ context.Context) (uint64, error) {
 	args := append([]string{
 		"query", "tip",
 		"--socket-path", b.socketPath,
@@ -127,7 +128,7 @@ func (b *TxProviderCli) GetSlot() (uint64, error) {
 	return legder.Slot, nil
 }
 
-func (b *TxProviderCli) SubmitTx(txSigned []byte) error {
+func (b *TxProviderCli) SubmitTx(_ context.Context, txSigned []byte) error {
 	txFilePath := path.Join(b.baseDirectory, "tx.send")
 
 	txBytes, err := TransactionWitnessedRaw(txSigned).ToJSON()

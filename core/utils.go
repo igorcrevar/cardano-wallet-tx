@@ -47,7 +47,7 @@ func GetAddressInfo(address string) (AddressInfo, error) {
 func WaitForTransaction(ctx context.Context, txRetriever ITxRetriever,
 	hash string, numRetries int, waitTime time.Duration) (map[string]interface{}, error) {
 	for count := 0; count < numRetries; count++ {
-		result, err := txRetriever.GetTxByHash(hash)
+		result, err := txRetriever.GetTxByHash(ctx, hash)
 		if err != nil {
 			return nil, err
 		} else if result != nil {

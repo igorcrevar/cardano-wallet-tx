@@ -76,7 +76,7 @@ func createTx(txProvider cardanowallet.ITxProvider,
 
 	defer builder.Dispose()
 
-	if err := builder.SetProtocolParametersAndTTL(txProvider, 0); err != nil {
+	if err := builder.SetProtocolParametersAndTTL(context.Background(), txProvider, 0); err != nil {
 		return nil, "", err
 	}
 
@@ -85,7 +85,7 @@ func createTx(txProvider cardanowallet.ITxProvider,
 		return nil, "", err
 	}
 
-	inputs, err := cardanowallet.GetUTXOsForAmount(txProvider, address, outputsSum+potentialFee)
+	inputs, err := cardanowallet.GetUTXOsForAmount(context.Background(), txProvider, address, outputsSum+potentialFee)
 	if err != nil {
 		return nil, "", err
 	}
@@ -168,7 +168,7 @@ func createMultiSigTx(
 
 	defer builder.Dispose()
 
-	if err := builder.SetProtocolParametersAndTTL(txProvider, 0); err != nil {
+	if err := builder.SetProtocolParametersAndTTL(context.Background(), txProvider, 0); err != nil {
 		return nil, "", err
 	}
 
@@ -177,12 +177,12 @@ func createMultiSigTx(
 		return nil, "", err
 	}
 
-	multiSigInputs, err := cardanowallet.GetUTXOsForAmount(txProvider, multiSigAddr, cardanowallet.MinUTxODefaultValue)
+	multiSigInputs, err := cardanowallet.GetUTXOsForAmount(context.Background(), txProvider, multiSigAddr, cardanowallet.MinUTxODefaultValue)
 	if err != nil {
 		return nil, "", err
 	}
 
-	multiSigFeeInputs, err := cardanowallet.GetUTXOsForAmount(txProvider, multiSigFeeAddr, potentialFee)
+	multiSigFeeInputs, err := cardanowallet.GetUTXOsForAmount(context.Background(), txProvider, multiSigFeeAddr, potentialFee)
 	if err != nil {
 		return nil, "", err
 	}
@@ -288,7 +288,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := txProviderBF.SubmitTx(multiSigTx); err != nil {
+	if err := txProviderBF.SubmitTx(context.Background(), multiSigTx); err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
@@ -307,7 +307,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := txProviderBF.SubmitTx(sigTx); err != nil {
+	if err := txProviderBF.SubmitTx(context.Background(), sigTx); err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}

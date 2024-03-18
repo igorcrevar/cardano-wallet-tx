@@ -1,5 +1,7 @@
 package core
 
+import "context"
+
 type Utxo struct {
 	Hash   string `json:"hsh"`
 	Index  uint32 `json:"ind"`
@@ -8,20 +10,20 @@ type Utxo struct {
 
 type ITxSubmitter interface {
 	// SubmitTx submits transaction - txSigned should be cbor serialized signed transaction
-	SubmitTx(txSigned []byte) error
+	SubmitTx(ctx context.Context, txSigned []byte) error
 }
 
 type ITxRetriever interface {
-	GetTxByHash(hash string) (map[string]interface{}, error)
+	GetTxByHash(ctx context.Context, hash string) (map[string]interface{}, error)
 }
 
 type ITxDataRetriever interface {
-	GetSlot() (uint64, error)
-	GetProtocolParameters() ([]byte, error)
+	GetSlot(ctx context.Context) (uint64, error)
+	GetProtocolParameters(ctx context.Context) ([]byte, error)
 }
 
 type IUTxORetriever interface {
-	GetUtxos(addr string) ([]Utxo, error)
+	GetUtxos(ctx context.Context, addr string) ([]Utxo, error)
 }
 
 type ITxProvider interface {

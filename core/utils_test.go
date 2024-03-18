@@ -89,7 +89,7 @@ func TestWaitForTransaction(t *testing.T) {
 	)
 
 	mock := &txRetrieverMock{
-		getTxByHashFn: func(hash string) (map[string]interface{}, error) {
+		getTxByHashFn: func(_ context.Context, hash string) (map[string]interface{}, error) {
 			switch hash {
 			case "a":
 				return nil, errWait
@@ -121,9 +121,9 @@ func TestWaitForTransaction(t *testing.T) {
 }
 
 type txRetrieverMock struct {
-	getTxByHashFn func(hash string) (map[string]interface{}, error)
+	getTxByHashFn func(ctx context.Context, hash string) (map[string]interface{}, error)
 }
 
-func (m txRetrieverMock) GetTxByHash(hash string) (map[string]interface{}, error) {
-	return m.getTxByHashFn(hash)
+func (m txRetrieverMock) GetTxByHash(ctx context.Context, hash string) (map[string]interface{}, error) {
+	return m.getTxByHashFn(ctx, hash)
 }

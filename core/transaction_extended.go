@@ -1,20 +1,23 @@
 package core
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 const defaultTimeToLiveInc = 200
 
-func (b *TxBuilder) SetProtocolParametersAndTTL(retriever ITxDataRetriever, timeToLiveInc uint64) error {
+func (b *TxBuilder) SetProtocolParametersAndTTL(ctx context.Context, retriever ITxDataRetriever, timeToLiveInc uint64) error {
 	if timeToLiveInc == 0 {
 		timeToLiveInc = defaultTimeToLiveInc
 	}
 
-	protocolParams, err := retriever.GetProtocolParameters()
+	protocolParams, err := retriever.GetProtocolParameters(ctx)
 	if err != nil {
 		return err
 	}
 
-	slot, err := retriever.GetSlot()
+	slot, err := retriever.GetSlot(ctx)
 	if err != nil {
 		return err
 	}
@@ -29,8 +32,8 @@ type TxInputs struct {
 	Sum    uint64
 }
 
-func GetUTXOsForAmount(retriever IUTxORetriever, addr string, desired uint64) (TxInputs, error) {
-	utxos, err := retriever.GetUtxos(addr)
+func GetUTXOsForAmount(ctx context.Context, retriever IUTxORetriever, addr string, desired uint64) (TxInputs, error) {
+	utxos, err := retriever.GetUtxos(ctx, addr)
 	if err != nil {
 		return TxInputs{}, err
 	}
@@ -72,8 +75,8 @@ func GetUTXOsForAmount(retriever IUTxORetriever, addr string, desired uint64) (T
 	return TxInputs{}, fmt.Errorf("not enough funds to generate the transaction: %d available vs %d required", amountSum, desired)
 }
 
-func GetUTXOs(retriever IUTxORetriever, addr string, desired uint64) (TxInputs, error) {
-	utxos, err := retriever.GetUtxos(addr)
+func GetUTXOs(ctx context.Context, retriever IUTxORetriever, addr string, desired uint64) (TxInputs, error) {
+	utxos, err := retriever.GetUtxos(ctx, addr)
 	if err != nil {
 		return TxInputs{}, err
 	}
