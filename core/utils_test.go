@@ -1,9 +1,12 @@
 package core
 
 import (
+	"context"
 	"encoding/hex"
+	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/assert"
@@ -15,45 +18,36 @@ func TestIsValidCardanoAddress(t *testing.T) {
 		"addr_test1vp4l5ka8jaqe32kygjemg6g745lxrn0mem7fxvuarrazmesdyntms",
 		"addr_test1wpkr0wd9ggr3zmfs7a2pg845jld95nvjjzg4mnr0ewqmzmsf689u8",
 		"addr1qy4h5rr93jh4x83448tk8y3whpddtyfq7g6pwr4tr3fuwcet0gxxtr902v0rt2whvwfzawz66kgjpu35zu82k8znca3sk9t664",
-		"addr1qy4h5rr93jh4x83448tk8y3whpddtyfq7g6pwr4tr3fuwcet0gxxtr902v0rt2whvwfzawz66kgjpu35zu82k8znca3sk9t664",
 		"stake1uy4h5rr93jh4x83448tk8y3whpddtyfq7g6pwr4tr3fuwccdjgq9n",
 		"addr1wpkr0wd9ggr3zmfs7a2pg845jld95nvjjzg4mnr0ewqmzmsf689u8",
 		"addr_test1wpkr0wd9ggr3zmfs7a2pg845jld95nvjjzg4mnr0ewqmzmef689u8",
 		"addr1qy4h5rr93jh4x83448tk8y3whpddtyfq7g6pwr4tr3fuwcet0gxxtr902v0rt2whvwfzawz66kgjpu35zu82k8znca3sket664",
-		"addr1qy4h5rr93jh4x83448tk8y3whpddtyfq7g6pwr4tr3fuwcet0gxxtr902v0rt2whvwfzawz66kgjpu35zu82k8znca3sk9t664",
 		"stake1uy4h5rr93jh4x83448tk8y3whpddtyfq7g6pwr4tr3fuwccdjgq9n",
-		"addr_test1wpkr0wd9ggr3zmfs7a2pg845jld95nvjjzg4mnr0ewqmzmsf689u8",
-	}
-	testNetwork := []AddressType{
-		AddressTypeTestBase,
-		AddressTypeAnyTest,
-		AddressTypeBase,
-		AddressTypeAnyMainnet,
-		AddressTypeStake,
-		AddressTypeBase,
-		AddressTypeTestBase,
-		AddressTypeBase,
-		AddressTypeTestBase,
-		AddressTypeBase,
-		AddressTypeTestStake,
 	}
 	results := []bool{
 		true,
 		true,
 		true,
 		true,
+		false,
+		false,
+		false,
 		true,
-		false,
-		false,
-		false,
-		false,
-		false,
-		false,
 	}
 
 	for i, addr := range addresses {
-		ai := GetAddressInfo(addr, testNetwork[i])
-		assert.Equal(t, results[i], ai.IsValid)
+		ai, err := GetAddressInfo(addr)
+		if results[i] {
+			if strings.Contains(ai.Address, "stake") {
+				assert.Equal(t, ai.Type, "stake")
+			} else {
+				assert.Equal(t, ai.Type, "payment")
+			}
+
+			assert.NoError(t, err)
+		} else {
+			require.ErrorContains(t, err, ErrInvalidAddressInfo.Error())
+		}
 	}
 }
 
@@ -84,6 +78,52 @@ func TestVerifyWitness(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.NoError(t, VerifyWitness(txHash, witnessCbor))
-	assert.ErrorIs(t, VerifyWitness(strings.Replace(txHash, "7e", "7f", 1), witnessCbor), ErrInvalidWitness)
-	assert.ErrorIs(t, VerifyWitness(txHash, dummyWitness), ErrInvalidWitness)
+	assert.ErrorIs(t, VerifyWitness(strings.Replace(txHash, "7e", "7f", 1), witnessCbor), ErrInvalidSignature)
+	assert.ErrorIs(t, VerifyWitness(txHash, dummyWitness), ErrInvalidSignature)
+}
+
+func TestWaitForTransaction(t *testing.T) {
+	var (
+		errWait = errors.New("hello wait")
+		txInfo  = map[string]interface{}{"block": "0x1001"}
+	)
+
+	mock := &txRetrieverMock{
+		getTxByHashFn: func(hash string) (map[string]interface{}, error) {
+			switch hash {
+			case "a":
+				return nil, errWait
+			case "b":
+				return txInfo, nil
+			default:
+				return nil, nil
+			}
+		},
+	}
+
+	_, err := WaitForTransaction(context.Background(), mock, "a", 10, time.Second)
+	require.ErrorIs(t, err, errWait)
+
+	_, err = WaitForTransaction(context.Background(), mock, "not_exist", 10, time.Millisecond*5)
+	require.ErrorIs(t, err, ErrWaitForTransactionTimeout)
+
+	data, err := WaitForTransaction(context.Background(), mock, "b", 10, time.Millisecond*5)
+	require.NoError(t, err)
+	require.Equal(t, txInfo, data)
+
+	ctx, cncl := context.WithCancel(context.Background())
+	go func() {
+		cncl()
+	}()
+
+	_, err = WaitForTransaction(ctx, mock, "not_exist", 10, time.Millisecond*5)
+	require.ErrorIs(t, err, ctx.Err())
+}
+
+type txRetrieverMock struct {
+	getTxByHashFn func(hash string) (map[string]interface{}, error)
+}
+
+func (m txRetrieverMock) GetTxByHash(hash string) (map[string]interface{}, error) {
+	return m.getTxByHashFn(hash)
 }

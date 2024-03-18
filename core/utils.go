@@ -11,64 +11,36 @@ import (
 	"time"
 )
 
-type AddressType string
-
-const (
-	AddressTypeStake      AddressType = "stake1"
-	AddressTypeBase       AddressType = "addr1"
-	AddressTypeTestStake  AddressType = "stake_test1"
-	AddressTypeTestBase   AddressType = "addr_test1"
-	AddressTypeAny        AddressType = ""
-	AddressTypeAnyTest    AddressType = "test"
-	AddressTypeAnyMainnet AddressType = "mainnet"
+var (
+	ErrInvalidSignature          = errors.New("invalid signature")
+	ErrInvalidAddressInfo        = errors.New("invalid address info")
+	ErrWaitForTransactionTimeout = errors.New("timeout while waiting for transaction")
 )
 
-var ErrInvalidWitness = errors.New("invalid witness")
-
 type AddressInfo struct {
-	Address  string      `json:"address"`
-	Base16   string      `json:"base16"`
-	Encoding string      `json:"encoding"`
-	Era      string      `json:"era"`
-	Type     AddressType `json:"type"`
-	IsValid  bool        `json:"-"`
-	ErrorMsg string      `json:"-"`
+	Address  string `json:"address"`
+	Base16   string `json:"base16"`
+	Encoding string `json:"encoding"`
+	Era      string `json:"era"`
+	Type     string `json:"type"`
 }
 
-// isValidCardanoAddress checks if the given string is a valid Cardano address.
-func GetAddressInfo(address string, addressType AddressType) AddressInfo {
+// GetAddressInfo returns address info if string representation for address is valid or error
+func GetAddressInfo(address string) (AddressInfo, error) {
+	var ai AddressInfo
+
 	res, err := runCommand(resolveCardanoCliBinary(), []string{
 		"address", "info", "--address", address,
 	})
 	if err != nil {
-		return AddressInfo{
-			IsValid:  false,
-			ErrorMsg: err.Error(),
-		}
+		return ai, errors.Join(ErrInvalidAddressInfo, err)
 	}
-
-	var ai AddressInfo
 
 	if err := json.Unmarshal([]byte(strings.Trim(res, "\n")), &ai); err != nil {
-		return AddressInfo{
-			IsValid:  false,
-			ErrorMsg: err.Error(),
-		}
+		return ai, errors.Join(ErrInvalidAddressInfo, err)
 	}
 
-	// Check if the address starts with correct prefix for mainnet and testnet respectively
-	switch addressType {
-	case AddressTypeAny:
-		ai.IsValid = true
-	case AddressTypeAnyMainnet:
-		ai.IsValid = strings.HasPrefix(ai.Address, string(AddressTypeBase)) || strings.HasPrefix(ai.Address, string(AddressTypeStake))
-	case AddressTypeAnyTest:
-		ai.IsValid = strings.HasPrefix(ai.Address, string(AddressTypeTestBase)) || strings.HasPrefix(ai.Address, string(AddressTypeTestStake))
-	default:
-		ai.IsValid = strings.HasPrefix(ai.Address, string(addressType))
-	}
-
-	return ai
+	return ai, nil
 }
 
 // WaitForTransaction waits for transaction to be included in block
@@ -83,13 +55,13 @@ func WaitForTransaction(ctx context.Context, txRetriever ITxRetriever,
 		}
 
 		select {
-		case <-time.After(waitTime):
 		case <-ctx.Done():
 			return nil, ctx.Err()
+		case <-time.After(waitTime):
 		}
 	}
 
-	return nil, fmt.Errorf("timeout while waiting for transaction %s to be processed", hash)
+	return nil, ErrWaitForTransactionTimeout
 }
 
 // VerifyWitness verifies if txHash is signed by witness
@@ -107,7 +79,7 @@ func VerifyWitness(txHash string, witness []byte) error {
 	return VerifyMessage(txHashBytes, vKey, signature)
 }
 
-// Sign signs message. This method can panic, use with caution!
+// SignMessage signs message
 func SignMessage(signingKey, verificationKey, message []byte) (result []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -134,12 +106,13 @@ func VerifyMessage(message, verificationKey, signature []byte) (err error) {
 	}()
 
 	if !ed25519.Verify(verificationKey, message, signature) {
-		err = ErrInvalidWitness
+		err = ErrInvalidSignature
 	}
 
 	return
 }
 
+// GetVerificationKeyFromSigningKey retrieves verification/public key from signing/private key
 func GetVerificationKeyFromSigningKey(signingKey []byte) []byte {
 	return ed25519.NewKeyFromSeed(signingKey).Public().(ed25519.PublicKey)
 }
