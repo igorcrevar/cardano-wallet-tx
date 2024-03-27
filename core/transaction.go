@@ -237,6 +237,7 @@ func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error 
 		"transaction", "build-raw",
 		"--protocol-params-file", protocolParamsFilePath,
 		"--fee", strconv.FormatUint(fee, 10),
+		"--invalid-hereafter", strconv.FormatUint(b.timeToLive, 10),
 		"--out-file", path.Join(b.baseDirectory, draftTxFile),
 	}
 
