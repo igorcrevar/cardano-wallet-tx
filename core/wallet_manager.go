@@ -57,15 +57,10 @@ func (w *WalletManager) Load(directory string) (IWallet, error) {
 		return nil, err
 	}
 
-	resultKeyHash, err := runCommand(resolveCardanoCliBinary(), []string{
-		"address", "key-hash",
-		"--payment-verification-key-file", dir.GetVerificationKeyPath(),
-	})
+	keyHash, err := GetKeyHashCli(dir.GetVerificationKeyPath())
 	if err != nil {
 		return nil, err
 	}
-
-	keyHash := strings.Trim(resultKeyHash, "\n")
 
 	return NewWallet(verificationKeyBytes, signingKeyBytes, keyHash), nil
 }
@@ -136,15 +131,10 @@ func (w *StakeWalletManager) Load(directory string) (IWallet, error) {
 		return nil, err
 	}
 
-	resultKeyHash, err := runCommand(resolveCardanoCliBinary(), []string{
-		"address", "key-hash",
-		"--payment-verification-key-file", dir.GetVerificationKeyPath(),
-	})
+	keyHash, err := GetKeyHashCli(dir.GetVerificationKeyPath())
 	if err != nil {
 		return nil, err
 	}
-
-	keyHash := strings.Trim(resultKeyHash, "\n")
 
 	return NewStakeWallet(verificationKeyBytes, signingKeyBytes, keyHash,
 		stakeVerificationKeyBytes, stakeSigningKeyBytes), nil
@@ -231,4 +221,16 @@ func GetWalletAddress(wallet IWallet, testNetMagic uint) (addr string, stakeAddr
 	}
 
 	return strings.Trim(addr, "\n"), strings.Trim(stakeAddr, "\n"), err
+}
+
+func GetKeyHashCli(verificationKeyPath string) (string, error) {
+	resultKeyHash, err := runCommand(resolveCardanoCliBinary(), []string{
+		"address", "key-hash",
+		"--payment-verification-key-file", verificationKeyPath,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return strings.Trim(resultKeyHash, "\n"), nil
 }

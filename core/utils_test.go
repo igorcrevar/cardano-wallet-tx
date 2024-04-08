@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"os"
+	"path"
 	"strings"
 	"testing"
 	"time"
@@ -93,6 +96,30 @@ func TestVerifyMessage(t *testing.T) {
 
 	require.NoError(t, VerifyMessage([]byte(msg), pub, signature))
 	require.ErrorIs(t, VerifyMessage([]byte("invalid msg"), pub, signature), ErrInvalidSignature)
+}
+
+func TestKeyHash(t *testing.T) {
+	baseDirectory, err := os.MkdirTemp("", "key-hash-test")
+	require.NoError(t, err)
+
+	defer func() {
+		os.RemoveAll(baseDirectory)
+		os.Remove(baseDirectory)
+	}()
+
+	const accountsNumber = 20
+
+	walletManager := NewStakeWalletManager()
+
+	for i := 0; i < accountsNumber; i++ {
+		wallet, err := walletManager.Create(path.Join(baseDirectory, fmt.Sprintf("a_%d", i)), true)
+		require.NoError(t, err)
+
+		keyHash, err := GetKeyHash(wallet.GetVerificationKey())
+		require.NoError(t, err)
+
+		assert.Equal(t, wallet.GetKeyHash(), keyHash)
+	}
 }
 
 func TestWaitForTransaction(t *testing.T) {
