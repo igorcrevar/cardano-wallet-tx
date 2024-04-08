@@ -82,6 +82,19 @@ func TestVerifyWitness(t *testing.T) {
 	assert.ErrorIs(t, VerifyWitness(txHash, dummyWitness), ErrInvalidSignature)
 }
 
+func TestVerifyMessage(t *testing.T) {
+	const msg = "Hello World!"
+
+	priv, pub, err := GenerateKeyPair()
+	require.NoError(t, err)
+
+	signature, err := SignMessage(priv, pub, []byte(msg))
+	require.NoError(t, err)
+
+	require.NoError(t, VerifyMessage([]byte(msg), pub, signature))
+	require.ErrorIs(t, VerifyMessage([]byte("invalid msg"), pub, signature), ErrInvalidSignature)
+}
+
 func TestWaitForTransaction(t *testing.T) {
 	var (
 		errWait = errors.New("hello wait")

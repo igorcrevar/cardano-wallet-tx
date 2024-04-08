@@ -3,10 +3,12 @@ package core
 import (
 	"context"
 	"crypto/ed25519"
+	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 )
@@ -115,4 +117,14 @@ func VerifyMessage(message, verificationKey, signature []byte) (err error) {
 // GetVerificationKeyFromSigningKey retrieves verification/public key from signing/private key
 func GetVerificationKeyFromSigningKey(signingKey []byte) []byte {
 	return ed25519.NewKeyFromSeed(signingKey).Public().(ed25519.PublicKey)
+}
+
+// GenerateKeyPair generates ed25519 (signing key, verifying) key pair
+func GenerateKeyPair() ([]byte, []byte, error) {
+	seed := make([]byte, ed25519.SeedSize)
+	if _, err := io.ReadFull(rand.Reader, seed); err != nil {
+		return nil, nil, err
+	}
+
+	return seed, GetVerificationKeyFromSigningKey(seed), nil
 }
