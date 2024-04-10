@@ -110,7 +110,7 @@ func (k Key) WriteToFile(filePath string) error {
 		return err
 	}
 
-	if err := os.WriteFile(filePath, bytes, 0755); err != nil {
+	if err := os.WriteFile(filePath, bytes, FilePermission); err != nil {
 		return err
 	}
 

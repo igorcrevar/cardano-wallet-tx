@@ -15,6 +15,8 @@ import (
 	"golang.org/x/crypto/blake2b"
 )
 
+const FilePermission = 0750
+
 var (
 	ErrInvalidSignature          = errors.New("invalid signature")
 	ErrInvalidAddressInfo        = errors.New("invalid address info")

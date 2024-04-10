@@ -36,7 +36,7 @@ func (ps PolicyScript) CreateMultiSigAddress(testNetMagic uint) (string, error) 
 	}()
 
 	policyScriptFilePath := path.Join(baseDirectory, "policy-script.json")
-	if err := os.WriteFile(policyScriptFilePath, ps.PolicyScript, 0755); err != nil {
+	if err := os.WriteFile(policyScriptFilePath, ps.PolicyScript, FilePermission); err != nil {
 		return "", err
 	}
 

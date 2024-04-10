@@ -169,7 +169,7 @@ func (w walletManagerDirectory) AreStakeFilesExist() bool {
 func (w walletManagerDirectory) CreateDirectoryIfNotExists() error {
 	if _, err := os.Stat(string(w)); os.IsNotExist(err) {
 		// If the directory doesn't exist, create it
-		return os.MkdirAll(string(w), 0755)
+		return os.MkdirAll(string(w), FilePermission)
 	}
 
 	return nil

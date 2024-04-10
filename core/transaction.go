@@ -156,7 +156,7 @@ func (b *TxBuilder) CalculateFee(witnessCount int) (uint64, error) {
 	}
 
 	protocolParamsFilePath := path.Join(b.baseDirectory, "protocol-parameters.json")
-	if err := os.WriteFile(protocolParamsFilePath, b.protocolParameters, 0755); err != nil {
+	if err := os.WriteFile(protocolParamsFilePath, b.protocolParameters, FilePermission); err != nil {
 		return 0, err
 	}
 
@@ -196,7 +196,7 @@ func (b *TxBuilder) Build() ([]byte, string, error) {
 	}
 
 	protocolParamsFilePath := path.Join(b.baseDirectory, "protocol-parameters.json")
-	if err := os.WriteFile(protocolParamsFilePath, b.protocolParameters, 0755); err != nil {
+	if err := os.WriteFile(protocolParamsFilePath, b.protocolParameters, FilePermission); err != nil {
 		return nil, "", err
 	}
 
@@ -228,7 +228,7 @@ func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error 
 
 	if b.metadata != nil {
 		metaDataFilePath = path.Join(b.baseDirectory, "metadata.json")
-		if err := os.WriteFile(metaDataFilePath, b.metadata, 0755); err != nil {
+		if err := os.WriteFile(metaDataFilePath, b.metadata, FilePermission); err != nil {
 			return err
 		}
 	}
@@ -246,7 +246,7 @@ func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error 
 
 		if inp.PolicyScript != nil {
 			policyFilePath = path.Join(b.baseDirectory, fmt.Sprintf("policy_%d.json", i))
-			if err := os.WriteFile(policyFilePath, inp.PolicyScript.GetPolicyScript(), 0755); err != nil {
+			if err := os.WriteFile(policyFilePath, inp.PolicyScript.GetPolicyScript(), FilePermission); err != nil {
 				return err
 			}
 
@@ -318,7 +318,7 @@ func AssembleTxWitnesses(txRaw []byte, witnesses [][]byte) ([]byte, error) {
 			return nil, err
 		}
 
-		if err := os.WriteFile(witnessesFilePaths[i], content, 0755); err != nil {
+		if err := os.WriteFile(witnessesFilePaths[i], content, FilePermission); err != nil {
 			return nil, err
 		}
 	}
@@ -328,7 +328,7 @@ func AssembleTxWitnesses(txRaw []byte, witnesses [][]byte) ([]byte, error) {
 		return nil, err
 	}
 
-	if err := os.WriteFile(txFilePath, txBytes, 0755); err != nil {
+	if err := os.WriteFile(txFilePath, txBytes, FilePermission); err != nil {
 		return nil, err
 	}
 
@@ -376,7 +376,7 @@ func getTxHash(txRaw []byte, baseDirectory string) (string, error) {
 		return "", err
 	}
 
-	if err := os.WriteFile(txFilePath, txBytes, 0755); err != nil {
+	if err := os.WriteFile(txFilePath, txBytes, FilePermission); err != nil {
 		return "", err
 	}
 

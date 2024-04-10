@@ -136,7 +136,7 @@ func (b *TxProviderCli) SubmitTx(_ context.Context, txSigned []byte) error {
 		return err
 	}
 
-	if err := os.WriteFile(txFilePath, txBytes, 0755); err != nil {
+	if err := os.WriteFile(txFilePath, txBytes, FilePermission); err != nil {
 		return err
 	}
 
