@@ -7,6 +7,8 @@ import (
 	"strconv"
 )
 
+const MainnetMagic = uint(764824073)
+
 type runCommandError struct {
 	desc string
 	base error
@@ -56,7 +58,7 @@ func isFileOrDirExists(fileOrDirPath string) bool {
 }
 
 func getTestNetMagicArgs(testnetMagic uint) []string {
-	if testnetMagic == 0 {
+	if testnetMagic == 0 || testnetMagic == MainnetMagic {
 		return []string{"--mainnet"}
 	}
 
