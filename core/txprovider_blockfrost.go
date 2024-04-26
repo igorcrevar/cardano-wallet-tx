@@ -89,9 +89,11 @@ func (b *TxProviderBlockFrost) GetUtxos(ctx context.Context, addr string) ([]Utx
 	}
 
 	response := make([]Utxo, len(responseData))
+
 	for i, v := range responseData {
 		amount := uint64(0)
 
+		//nolint:forcetypeassert
 		for _, item := range v["amount"].([]interface{}) {
 			itemMap := item.(map[string]interface{})
 			if itemMap["unit"].(string) == "lovelace" {
@@ -104,6 +106,7 @@ func (b *TxProviderBlockFrost) GetUtxos(ctx context.Context, addr string) ([]Utx
 			}
 		}
 
+		//nolint:forcetypeassert
 		response[i] = Utxo{
 			Hash:   v["tx_hash"].(string),
 			Index:  uint32(v["output_index"].(float64)),
@@ -143,7 +146,7 @@ func (b *TxProviderBlockFrost) GetSlot(ctx context.Context) (uint64, error) {
 		return 0, err
 	}
 
-	return uint64(responseData["slot"].(float64)), nil
+	return uint64(responseData["slot"].(float64)), nil //nolint:forcetypeassert
 }
 
 func (b *TxProviderBlockFrost) SubmitTx(ctx context.Context, txSigned []byte) error {
@@ -214,10 +217,12 @@ func convertProtocolParameters(bytes []byte) ([]byte, error) {
 
 	strToUInt64 := func(s string) uint64 {
 		v, _ := strconv.ParseUint(s, 10, 64)
+
 		return v
 	}
 
-	resultJson := map[string]interface{}{
+	//nolint:forcetypeassert
+	resultJSON := map[string]interface{}{
 		"extraPraosEntropy": nil,
 		"decentralization":  nil,
 		"protocolVersion": map[string]interface{}{
@@ -256,9 +261,10 @@ func convertProtocolParameters(bytes []byte) ([]byte, error) {
 		"maxValueSize":        strToUInt64(jsonMap["max_val_size"].(string)),
 	}
 
+	//nolint
 	// TODO: "costModels": "PlutusV1" ...
 
-	return json.Marshal(resultJson)
+	return json.Marshal(resultJSON)
 }
 
 func getErrorFromResponse(resp *http.Response) error {

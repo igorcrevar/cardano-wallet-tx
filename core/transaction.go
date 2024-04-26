@@ -209,7 +209,7 @@ func (b *TxBuilder) Build() ([]byte, string, error) {
 		return nil, "", err
 	}
 
-	txRaw, err := NewTransactionUnwitnessedRawFromJson(bytes)
+	txRaw, err := NewTransactionUnwitnessedRawFromJSON(bytes)
 	if err != nil {
 		return nil, "", err
 	}
@@ -223,16 +223,6 @@ func (b *TxBuilder) Build() ([]byte, string, error) {
 }
 
 func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error {
-	metaDataFilePath := ""
-	policyFilePath := ""
-
-	if b.metadata != nil {
-		metaDataFilePath = path.Join(b.baseDirectory, "metadata.json")
-		if err := os.WriteFile(metaDataFilePath, b.metadata, FilePermission); err != nil {
-			return err
-		}
-	}
-
 	args := []string{
 		"transaction", "build-raw",
 		"--protocol-params-file", protocolParamsFilePath,
@@ -241,11 +231,20 @@ func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error 
 		"--out-file", path.Join(b.baseDirectory, draftTxFile),
 	}
 
+	if b.metadata != nil {
+		metaDataFilePath := path.Join(b.baseDirectory, "metadata.json")
+		if err := os.WriteFile(metaDataFilePath, b.metadata, FilePermission); err != nil {
+			return err
+		}
+
+		args = append(args, "--metadata-json-file", metaDataFilePath)
+	}
+
 	for i, inp := range b.inputs {
 		args = append(args, "--tx-in", inp.Input.String())
 
 		if inp.PolicyScript != nil {
-			policyFilePath = path.Join(b.baseDirectory, fmt.Sprintf("policy_%d.json", i))
+			policyFilePath := path.Join(b.baseDirectory, fmt.Sprintf("policy_%d.json", i))
 			if err := os.WriteFile(policyFilePath, inp.PolicyScript.GetPolicyScript(), FilePermission); err != nil {
 				return err
 			}
@@ -258,11 +257,8 @@ func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error 
 		args = append(args, "--tx-out", out.String())
 	}
 
-	if metaDataFilePath != "" {
-		args = append(args, "--metadata-json-file", metaDataFilePath)
-	}
-
 	_, err := runCommand(resolveCardanoCliBinary(), args)
+
 	return err
 }
 
@@ -350,7 +346,7 @@ func AssembleTxWitnesses(txRaw []byte, witnesses [][]byte) ([]byte, error) {
 		return nil, err
 	}
 
-	return NewTransactionWitnessedRawFromJson(bytes)
+	return NewTransactionWitnessedRawFromJSON(bytes)
 }
 
 // GetTxHash gets hash from transaction cbor slice

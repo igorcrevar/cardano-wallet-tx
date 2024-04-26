@@ -120,7 +120,7 @@ func VerifyMessage(message, verificationKey, signature []byte) (err error) {
 
 // GetVerificationKeyFromSigningKey retrieves verification/public key from signing/private key
 func GetVerificationKeyFromSigningKey(signingKey []byte) []byte {
-	return ed25519.NewKeyFromSeed(signingKey).Public().(ed25519.PublicKey)
+	return ed25519.NewKeyFromSeed(signingKey).Public().(ed25519.PublicKey) //nolint:forcetypeassert
 }
 
 // GenerateKeyPair generates ed25519 (signing key, verifying) key pair

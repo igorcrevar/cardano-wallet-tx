@@ -40,9 +40,11 @@ func runCommand(binary string, args []string, envVariables ...string) (string, e
 	cmd := exec.Command(binary, args...)
 	cmd.Stderr = &stdErrBuffer
 	cmd.Stdout = &stdOutBuffer
+
 	cmd.Env = append(os.Environ(), envVariables...)
 
 	err := cmd.Run()
+
 	if stdErrBuffer.Len() > 0 {
 		return "", runCommandError{desc: stdErrBuffer.String()}
 	} else if err != nil {
@@ -54,6 +56,7 @@ func runCommand(binary string, args []string, envVariables ...string) (string, e
 
 func isFileOrDirExists(fileOrDirPath string) bool {
 	_, err := os.Stat(fileOrDirPath)
+
 	return err == nil || !os.IsNotExist(err)
 }
 

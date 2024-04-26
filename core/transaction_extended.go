@@ -7,7 +7,9 @@ import (
 
 const defaultTimeToLiveInc = 200
 
-func (b *TxBuilder) SetProtocolParametersAndTTL(ctx context.Context, retriever ITxDataRetriever, timeToLiveInc uint64) error {
+func (b *TxBuilder) SetProtocolParametersAndTTL(
+	ctx context.Context, retriever ITxDataRetriever, timeToLiveInc uint64,
+) error {
 	if timeToLiveInc == 0 {
 		timeToLiveInc = defaultTimeToLiveInc
 	}
@@ -40,6 +42,7 @@ func GetUTXOsForAmount(ctx context.Context, retriever IUTxORetriever, addr strin
 
 	// Loop through utxos to find first input with enough tokens
 	// If we don't have this UTXO we need to use more of them
+	//nolint:prealloc
 	var (
 		amountSum   = uint64(0)
 		chosenUTXOs []TxInput
@@ -72,7 +75,8 @@ func GetUTXOsForAmount(ctx context.Context, retriever IUTxORetriever, addr strin
 		}
 	}
 
-	return TxInputs{}, fmt.Errorf("not enough funds to generate the transaction: %d available vs %d required", amountSum, desired)
+	return TxInputs{}, fmt.Errorf(
+		"not enough funds to generate the transaction: %d available vs %d required", amountSum, desired)
 }
 
 func GetUTXOs(ctx context.Context, retriever IUTxORetriever, addr string, desired uint64) (TxInputs, error) {
@@ -81,6 +85,7 @@ func GetUTXOs(ctx context.Context, retriever IUTxORetriever, addr string, desire
 		return TxInputs{}, err
 	}
 
+	//nolint:prealloc
 	var (
 		amountSum   = uint64(0)
 		chosenUTXOs []TxInput
@@ -101,7 +106,8 @@ func GetUTXOs(ctx context.Context, retriever IUTxORetriever, addr string, desire
 		}, nil
 	}
 
-	return TxInputs{}, fmt.Errorf("not enough funds to generate the transaction: %d available vs %d required", amountSum, desired)
+	return TxInputs{}, fmt.Errorf(
+		"not enough funds to generate the transaction: %d available vs %d required", amountSum, desired)
 }
 
 func GetOutputsSum(outputs []TxOutput) (receiversSum uint64) {
