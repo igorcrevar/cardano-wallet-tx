@@ -71,7 +71,7 @@ func (ps PolicyScript) CreateMultiSigAddress(testNetMagic uint) (string, error) 
 	return strings.Trim(response, "\n"), nil
 }
 
-func (ps PolicyScript) GetPolicyId() (string, error) {
+func (ps PolicyScript) GetPolicyID() (string, error) {
 	baseDirectory, err := os.MkdirTemp("", "cardano-policy-id")
 	if err != nil {
 		return "", err
@@ -87,7 +87,7 @@ func (ps PolicyScript) GetPolicyId() (string, error) {
 		return "", err
 	}
 
-	return getPolicyId(policyScriptFilePath)
+	return getPolicyID(policyScriptFilePath)
 }
 
 func (ps PolicyScript) GetPolicyScript() []byte {
@@ -120,7 +120,7 @@ func createPolicyScript(keyHashes []string, atLeastSignersCount int) ([]byte, er
 	return json.MarshalIndent(p, "", "  ")
 }
 
-func getPolicyId(policyScriptFilePath string) (string, error) {
+func getPolicyID(policyScriptFilePath string) (string, error) {
 	response, err := runCommand(resolveCardanoCliBinary(), []string{
 		"transaction", "policyid", "--script-file", policyScriptFilePath,
 	})
