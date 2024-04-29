@@ -8,6 +8,17 @@ type Utxo struct {
 	Amount uint64 `json:"amount"`
 }
 
+type QueryTipData struct {
+	Block           uint64 `json:"block"`
+	Epoch           uint64 `json:"epoch"`
+	Era             string `json:"era"`
+	Hash            string `json:"hash"`
+	Slot            uint64 `json:"slot"`
+	SlotInEpoch     uint64 `json:"slotInEpoch"`
+	SlotsToEpochEnd uint64 `json:"slotsToEpochEnd"`
+	SyncProgress    string `json:"syncProgress"`
+}
+
 type ITxSubmitter interface {
 	// SubmitTx submits transaction - txSigned should be cbor serialized signed transaction
 	SubmitTx(ctx context.Context, txSigned []byte) error
@@ -18,7 +29,7 @@ type ITxRetriever interface {
 }
 
 type ITxDataRetriever interface {
-	GetSlot(ctx context.Context) (uint64, error)
+	GetTip(ctx context.Context) (QueryTipData, error)
 	GetProtocolParameters(ctx context.Context) ([]byte, error)
 }
 

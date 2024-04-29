@@ -19,12 +19,12 @@ func (b *TxBuilder) SetProtocolParametersAndTTL(
 		return err
 	}
 
-	slot, err := retriever.GetSlot(ctx)
+	tip, err := retriever.GetTip(ctx)
 	if err != nil {
 		return err
 	}
 
-	b.SetProtocolParameters(protocolParams).SetTimeToLive(slot + timeToLiveInc)
+	b.SetProtocolParameters(protocolParams).SetTimeToLive(tip.Slot + timeToLiveInc)
 
 	return nil
 }

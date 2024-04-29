@@ -16,6 +16,8 @@ type TxProviderCli struct {
 	socketPath    string
 }
 
+var _ ITxProvider = (*TxProviderCli)(nil)
+
 func NewTxProviderCli(testNetMagic uint, socketPath string) (*TxProviderCli, error) {
 	baseDirectory, err := os.MkdirTemp("", "cardano-txs")
 	if err != nil {
@@ -99,7 +101,7 @@ func (b *TxProviderCli) GetUtxos(_ context.Context, addr string) ([]Utxo, error)
 	return inputs, nil
 }
 
-func (b *TxProviderCli) GetSlot(_ context.Context) (uint64, error) {
+func (b *TxProviderCli) GetTip(_ context.Context) (QueryTipData, error) {
 	args := append([]string{
 		"query", "tip",
 		"--socket-path", b.socketPath,
@@ -107,25 +109,16 @@ func (b *TxProviderCli) GetSlot(_ context.Context) (uint64, error) {
 
 	res, err := runCommand(resolveCardanoCliBinary(), args)
 	if err != nil {
-		return 0, err
+		return QueryTipData{}, err
 	}
 
-	var legder struct {
-		Block           uint64 `json:"block"`
-		Epoch           uint64 `json:"epoch"`
-		Era             string `json:"era"`
-		Hash            string `json:"hash"`
-		Slot            uint64 `json:"slot"`
-		SlotInEpoch     uint64 `json:"slotInEpoch"`
-		SlotsToEpochEnd uint64 `json:"slotsToEpochEnd"`
-		SyncProgress    string `json:"syncProgress"`
+	var result QueryTipData
+
+	if err := json.Unmarshal([]byte(res), &result); err != nil {
+		return result, err
 	}
 
-	if err := json.Unmarshal([]byte(res), &legder); err != nil {
-		return 0, err
-	}
-
-	return legder.Slot, nil
+	return result, nil
 }
 
 func (b *TxProviderCli) SubmitTx(_ context.Context, txSigned []byte) error {

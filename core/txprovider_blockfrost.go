@@ -15,6 +15,8 @@ type TxProviderBlockFrost struct {
 	projectID string
 }
 
+var _ ITxProvider = (*TxProviderBlockFrost)(nil)
+
 func NewTxProviderBlockFrost(url string, projectID string) (*TxProviderBlockFrost, error) {
 	return &TxProviderBlockFrost{
 		projectID: projectID,
@@ -117,11 +119,11 @@ func (b *TxProviderBlockFrost) GetUtxos(ctx context.Context, addr string) ([]Utx
 	return response, nil
 }
 
-func (b *TxProviderBlockFrost) GetSlot(ctx context.Context) (uint64, error) {
+func (b *TxProviderBlockFrost) GetTip(ctx context.Context) (QueryTipData, error) {
 	// Create a request with the JSON payload
 	req, err := http.NewRequestWithContext(ctx, "GET", b.url+"/blocks/latest", nil)
 	if err != nil {
-		return 0, err
+		return QueryTipData{}, err
 	}
 
 	// Set the Content-Type header to application/json
@@ -131,22 +133,29 @@ func (b *TxProviderBlockFrost) GetSlot(ctx context.Context) (uint64, error) {
 	// Make the HTTP request
 	resp, err := new(http.Client).Do(req)
 	if err != nil {
-		return 0, err
+		return QueryTipData{}, err
 	}
 
 	defer resp.Body.Close()
 
 	// Check the HTTP status code
 	if resp.StatusCode != http.StatusOK {
-		return 0, getErrorFromResponse(resp)
+		return QueryTipData{}, getErrorFromResponse(resp)
 	}
 
 	var responseData map[string]interface{}
 	if err = json.NewDecoder(resp.Body).Decode(&responseData); err != nil {
-		return 0, err
+		return QueryTipData{}, err
 	}
 
-	return uint64(responseData["slot"].(float64)), nil //nolint:forcetypeassert
+	//nolint:forcetypeassert
+	return QueryTipData{
+		Slot:        uint64(responseData["slot"].(float64)),
+		Block:       uint64(responseData["height"].(float64)),
+		Epoch:       uint64(responseData["epoch"].(float64)),
+		SlotInEpoch: uint64(responseData["epoch_slot"].(float64)),
+		Hash:        responseData["hash"].(string),
+	}, nil
 }
 
 func (b *TxProviderBlockFrost) SubmitTx(ctx context.Context, txSigned []byte) error {
