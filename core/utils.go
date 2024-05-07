@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"strings"
 	"time"
 
@@ -68,6 +69,34 @@ func WaitForTransaction(ctx context.Context, txRetriever ITxRetriever,
 	}
 
 	return nil, ErrWaitForTransactionTimeout
+}
+
+// WaitForAmount waits for address to have amount specified by cmpHandler
+func WaitForAmount(ctx context.Context, txRetriever IUTxORetriever,
+	addr string, cmpHandler func(*big.Int) bool, numRetries int, waitTime time.Duration) error {
+	for count := 0; count < numRetries; count++ {
+		uxtos, err := txRetriever.GetUtxos(ctx, addr)
+		if err != nil {
+			return err
+		} else {
+			sum := big.NewInt(0)
+			for _, utxo := range uxtos {
+				sum.Add(sum, new(big.Int).SetUint64(utxo.Amount))
+			}
+
+			if cmpHandler(sum) {
+				return nil
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(waitTime):
+		}
+	}
+
+	return ErrWaitForTransactionTimeout
 }
 
 // VerifyWitness verifies if txHash is signed by witness

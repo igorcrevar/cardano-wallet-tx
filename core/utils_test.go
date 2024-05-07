@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"path"
 	"strings"
@@ -160,10 +161,64 @@ func TestWaitForTransaction(t *testing.T) {
 	require.ErrorIs(t, err, ctx.Err())
 }
 
+func TestWaitForUtxos(t *testing.T) {
+	var (
+		errWait = errors.New("hello wait")
+		txInfo1 = []Utxo{
+			{Amount: 10},
+		}
+		txInfo2 = []Utxo{
+			{Amount: 10},
+			{Amount: 20},
+		}
+	)
+
+	mock := &txRetrieverMock{
+		getUtxosFn: func(_ context.Context, addr string) ([]Utxo, error) {
+			switch addr {
+			case "a":
+				return nil, errWait
+			case "b":
+				return txInfo1, nil
+			case "c":
+				return txInfo2, nil
+			default:
+				return nil, nil
+			}
+		},
+	}
+
+	cmpHandler := func(val *big.Int) bool {
+		return val.Cmp(new(big.Int).SetUint64(30)) >= 0
+	}
+
+	err := WaitForAmount(context.Background(), mock, "a", cmpHandler, 10, time.Second)
+	require.ErrorIs(t, err, errWait)
+
+	err = WaitForAmount(context.Background(), mock, "b", cmpHandler, 10, time.Second)
+	require.ErrorIs(t, err, ErrWaitForTransactionTimeout)
+
+	err = WaitForAmount(context.Background(), mock, "c", cmpHandler, 10, time.Second)
+	require.NoError(t, err)
+
+	ctx, cncl := context.WithCancel(context.Background())
+	go func() {
+		cncl()
+	}()
+
+	err = WaitForAmount(ctx, mock, "not_exists", cmpHandler, 10, time.Second)
+	require.ErrorIs(t, err, ctx.Err())
+}
+
 type txRetrieverMock struct {
 	getTxByHashFn func(ctx context.Context, hash string) (map[string]interface{}, error)
+	getUtxosFn    func(ctx context.Context, addr string) ([]Utxo, error)
 }
 
 func (m txRetrieverMock) GetTxByHash(ctx context.Context, hash string) (map[string]interface{}, error) {
 	return m.getTxByHashFn(ctx, hash)
+}
+
+func (m txRetrieverMock) GetUtxos(ctx context.Context, addr string) ([]Utxo, error) {
+	return m.getUtxosFn(ctx, addr)
 }
