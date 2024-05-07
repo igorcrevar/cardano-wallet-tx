@@ -165,8 +165,10 @@ func (b *TxBuilder) CalculateFee(witnessCount int) (uint64, error) {
 	}
 
 	if witnessCount == 0 {
-		for _, x := range b.inputs {
-			witnessCount += x.PolicyScript.GetCount()
+		for _, inp := range b.inputs {
+			if inp.PolicyScript != nil {
+				witnessCount += inp.PolicyScript.GetCount()
+			}
 		}
 
 		if witnessCount == 0 {
