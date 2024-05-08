@@ -71,22 +71,25 @@ func WaitForTransaction(ctx context.Context, txRetriever ITxRetriever,
 	return nil, ErrWaitForTransactionTimeout
 }
 
+// GetUtxosSum returns big.Int sum of all utxos
+func GetUtxosSum(utxos []Utxo) *big.Int {
+	sum := big.NewInt(0)
+	for _, utxo := range utxos {
+		sum.Add(sum, new(big.Int).SetUint64(utxo.Amount))
+	}
+
+	return sum
+}
+
 // WaitForAmount waits for address to have amount specified by cmpHandler
 func WaitForAmount(ctx context.Context, txRetriever IUTxORetriever,
 	addr string, cmpHandler func(*big.Int) bool, numRetries int, waitTime time.Duration) error {
 	for count := 0; count < numRetries; count++ {
-		uxtos, err := txRetriever.GetUtxos(ctx, addr)
+		utxos, err := txRetriever.GetUtxos(ctx, addr)
 		if err != nil {
 			return err
-		} else {
-			sum := big.NewInt(0)
-			for _, utxo := range uxtos {
-				sum.Add(sum, new(big.Int).SetUint64(utxo.Amount))
-			}
-
-			if cmpHandler(sum) {
-				return nil
-			}
+		} else if cmpHandler(GetUtxosSum(utxos)) {
+			return nil
 		}
 
 		select {

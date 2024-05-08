@@ -150,3 +150,7 @@ func (b *TxProviderCli) SubmitTx(_ context.Context, txSigned []byte) error {
 
 	return fmt.Errorf("unknown error submiting tx: %s", res)
 }
+
+func (b *TxProviderCli) GetTxByHash(ctx context.Context, hash string) (map[string]interface{}, error) {
+	panic("not implemented") //nolint:gocritic
+}

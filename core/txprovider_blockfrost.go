@@ -17,11 +17,11 @@ type TxProviderBlockFrost struct {
 
 var _ ITxProvider = (*TxProviderBlockFrost)(nil)
 
-func NewTxProviderBlockFrost(url string, projectID string) (*TxProviderBlockFrost, error) {
+func NewTxProviderBlockFrost(url string, projectID string) *TxProviderBlockFrost {
 	return &TxProviderBlockFrost{
 		projectID: projectID,
 		url:       url,
-	}, nil
+	}
 }
 
 func (b *TxProviderBlockFrost) Dispose() {

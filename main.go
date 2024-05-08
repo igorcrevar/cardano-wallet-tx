@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"os"
 	"os/user"
 	"path"
@@ -15,11 +16,25 @@ import (
 const (
 	socketPath              = "/home/bbs/Apps/card/node.socket"
 	testNetMagic            = uint(2)
+	ogmiosUrl               = "http://localhost:1337"
 	blockfrostUrl           = "https://cardano-preview.blockfrost.io/api/v0"
 	blockfrostProjectApiKey = ""
 	potentialFee            = uint64(300_000)
 	providerName            = "blockfrost"
 )
+
+func getSplitedStr(s string, mxlen int) (res []string) {
+	for i := 0; i < len(s); i += mxlen {
+		end := i + mxlen
+		if end > len(s) {
+			end = len(s)
+		}
+
+		res = append(res, s[i:end])
+	}
+
+	return res
+}
 
 func getKeyHashes(wallets []cardanowallet.IWallet) []string {
 	keyHashes := make([]string, len(wallets))
@@ -47,8 +62,10 @@ func createWallets(walletMngr cardanowallet.IWalletManager, keyDirectory string,
 	return wallets, nil
 }
 
-func createTx(txProvider cardanowallet.ITxProvider,
-	wallet cardanowallet.IWallet, testNetMagic uint, potentialFee uint64) ([]byte, string, error) {
+func createTx(
+	txProvider cardanowallet.ITxProvider, wallet cardanowallet.IWallet, testNetMagic uint, potentialFee uint64,
+	receiverAddr string,
+) ([]byte, string, error) {
 	address, _, err := cardanowallet.GetWalletAddress(wallet, testNetMagic)
 	if err != nil {
 		return nil, "", err
@@ -63,7 +80,7 @@ func createTx(txProvider cardanowallet.ITxProvider,
 	}
 	outputs := []cardanowallet.TxOutput{
 		{
-			Addr:   "addr_test1vqjysa7p4mhu0l25qknwznvj0kghtr29ud7zp732ezwtzec0w8g3u",
+			Addr:   receiverAddr,
 			Amount: cardanowallet.MinUTxODefaultValue,
 		},
 	}
@@ -119,11 +136,10 @@ func createTx(txProvider cardanowallet.ITxProvider,
 }
 
 func createMultiSigTx(
-	txProvider cardanowallet.ITxProvider,
-	signers []cardanowallet.IWallet,
-	feeSigners []cardanowallet.IWallet,
-	testNetMagic uint,
-	potentialFee uint64) ([]byte, string, error) {
+	txProvider cardanowallet.ITxProvider, signers []cardanowallet.IWallet,
+	feeSigners []cardanowallet.IWallet, testNetMagic uint, potentialFee uint64,
+	receiverAddr string,
+) ([]byte, string, error) {
 	policyScriptMultiSig, err := cardanowallet.NewPolicyScript(getKeyHashes(signers), len(signers)*2/3+1)
 	if err != nil {
 		return nil, "", err
@@ -148,14 +164,36 @@ func createMultiSigTx(
 
 	metadata := map[string]interface{}{
 		"0": map[string]interface{}{
-			"type":       "multi",
-			"signers":    len(signers),
-			"feeSigners": len(feeSigners),
+			"type": "multi",
+		},
+		"1": map[string]interface{}{
+			"destinationChainId": "vector",
+			"senderAddr": getSplitedStr(
+				"addr_test1qzf762fxqdyc79d3zzjplc57z6dpnrkygq5960tjguh683n3evd0dmxh9k7yzdxvqv9279nmkkwhx4m5wkj006a44nyscj7w9r",
+				40,
+			),
+			"transactions": []map[string]interface{}{
+				{
+					"address": getSplitedStr(
+						"addr_test1wp9g0wy5f58ruvt3d8cf2v3hylna934p99y0pwv8a4pm2wcx9he4s",
+						40,
+					),
+					"amount": 1100000,
+				},
+				{
+					"address": getSplitedStr(
+						"addr_test1qqpszngm7jx9seaw9pr6pql7hey62an4k8lk6uncmagfd6wtn8ktl44rmpwahjg9w349v2tcf9zvujxd442qr3j24fms3fr687",
+						40,
+					),
+					"amount": 1000000,
+				},
+			},
+			"type": "bridgingRequest",
 		},
 	}
 	outputs := []cardanowallet.TxOutput{
 		{
-			Addr:   "addr_test1vqjysa7p4mhu0l25qknwznvj0kghtr29ud7zp732ezwtzec0w8g3u",
+			Addr:   receiverAddr,
 			Amount: cardanowallet.MinUTxODefaultValue,
 		},
 	}
@@ -245,7 +283,9 @@ func createMultiSigTx(
 func createProvider(name string) (cardanowallet.ITxProvider, error) {
 	switch name {
 	case "blockfrost":
-		return cardanowallet.NewTxProviderBlockFrost(blockfrostUrl, blockfrostProjectApiKey)
+		return cardanowallet.NewTxProviderBlockFrost(blockfrostUrl, blockfrostProjectApiKey), nil
+	case "ogmios":
+		return cardanowallet.NewTxProviderOgmios(ogmiosUrl), nil
 	default:
 		return cardanowallet.NewTxProviderCli(testNetMagic, socketPath)
 	}
@@ -257,6 +297,34 @@ func createWalletMngr(isStake bool) cardanowallet.IWalletManager {
 	}
 
 	return cardanowallet.NewWalletManager()
+}
+
+func submitTx(
+	ctx context.Context, txProvider cardanowallet.ITxProvider, txRaw []byte, txHash string, addr string,
+) error {
+	utxo, err := txProvider.GetUtxos(ctx, addr)
+	if err != nil {
+		return err
+	}
+
+	prev := cardanowallet.GetUtxosSum(utxo)
+
+	if err := txProvider.SubmitTx(context.Background(), txRaw); err != nil {
+		return err
+	}
+
+	fmt.Println("transaction has been submitted. hash =", txHash)
+
+	err = cardanowallet.WaitForAmount(ctx, txProvider, addr, func(val *big.Int) bool {
+		return prev.Cmp(val) < 0
+	}, 60, time.Second*5)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("transaction has been included in block. hash =", txHash)
+
+	return nil
 }
 
 func main() {
@@ -272,51 +340,41 @@ func main() {
 		os.Exit(1)
 	}
 
-	txProviderBF, err := createProvider(providerName)
+	txProvider, err := createProvider(providerName)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
 
-	defer txProviderBF.Dispose()
+	defer txProvider.Dispose()
 
-	txRetriever := txProviderBF.(cardanowallet.ITxRetriever)
-
-	multiSigTx, multiSigTxHash, err := createMultiSigTx(txProviderBF, wallets[:3], wallets[3:], testNetMagic, potentialFee)
+	receiverAddr, _, err := cardanowallet.GetWalletAddress(wallets[1], testNetMagic)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
 
-	if err := txProviderBF.SubmitTx(context.Background(), multiSigTx); err != nil {
-		fmt.Printf("error: %v\n", err)
-		os.Exit(1)
-	}
-
-	txData, err := cardanowallet.WaitForTransaction(context.Background(), txRetriever, multiSigTxHash, 100, time.Second*2)
-	if err != nil {
-		fmt.Printf("error waiting for multisig transaction: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Println("transaction has been submitted. hash =", multiSigTxHash, " block =", txData["block"])
-
-	sigTx, txHash, err := createTx(txProviderBF, wallets[0], testNetMagic, potentialFee)
+	multiSigTx, multiSigTxHash, err := createMultiSigTx(
+		txProvider, wallets[:3], wallets[3:], testNetMagic, potentialFee, receiverAddr)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
 
-	if err := txProviderBF.SubmitTx(context.Background(), sigTx); err != nil {
+	if err := submitTx(context.Background(), txProvider, multiSigTx, multiSigTxHash, receiverAddr); err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
 
-	txData, err = cardanowallet.WaitForTransaction(context.Background(), txRetriever, txHash, 100, time.Second*2)
+	sigTx, txHash, err := createTx(
+		txProvider, wallets[0], testNetMagic, potentialFee, receiverAddr)
 	if err != nil {
-		fmt.Printf("error waiting for transaction: %v\n", err)
+		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("transaction has been submitted. hash =", txHash, " block =", txData["block"])
+	if err := submitTx(context.Background(), txProvider, sigTx, txHash, receiverAddr); err != nil {
+		fmt.Printf("error: %v\n", err)
+		os.Exit(1)
+	}
 }
