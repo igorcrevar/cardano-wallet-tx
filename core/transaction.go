@@ -132,6 +132,17 @@ func (b *TxBuilder) UpdateOutputAmount(index int, amount uint64) *TxBuilder {
 	return b
 }
 
+func (b *TxBuilder) RemoveOutput(index int) *TxBuilder {
+	if index < 0 {
+		index = len(b.outputs) + index
+	}
+
+	copy(b.outputs[index:], b.outputs[index+1:])
+	b.outputs = b.outputs[:len(b.outputs)-1]
+
+	return b
+}
+
 func (b *TxBuilder) SetMetaData(metadata []byte) *TxBuilder {
 	b.metadata = metadata
 

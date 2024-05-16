@@ -117,3 +117,57 @@ func TestTransactionBuilder(t *testing.T) {
 	assert.Equal(t, "84a50083825820098236134e0f2077a6434dd9d7727126fa8b3627bcab3ae030a194d46eded73e00825820d1fd0d772be7741d9bfaf0b037d02d2867a987ccba3e6ba2ee9aa2a861b7314502825820e99a5bde15aa05f24fcc04b7eabc1520d3397283b1ee720de9fe2653abbb0c9f00018382581d60244877c1aeefc7fd5405a6e14d927d91758d45e37c20fa2ac89cb1671a000f424082581d700c25e4ff24cfa0dfebcec382095161271dc9bb744ca4149ec604dc991482581d70a5caf9ce4bed09c794ee87bddb6505822db5bd476a4f61e0cd4074a21a000b3ca7021a0004059903196dc0075820981cfc0e6c2095e5e630840d9e8c078a2d13677ac5f97d8945d8d0c46a53047ca10182830304858200581cd6b67f93ffa4e2651271cc9bcdbdedb2539911266b534d9c163cba218200581ccba89c7084bf0ce4bf404346b668a7e83c8c9c250d1cafd8d8996e418200581c79df3577e4c7d7da04872c2182b8d8829d7b477912dbf35d89287c398200581c2368e8113bd5f32d713751791d29acee9e1b5a425b0454b963b2558b8200581c06b4c7f5254d6395b527ac3de60c1d77194df7431d85fe55ca8f107d830304858200581cf0f4837b3a306752a2b3e52394168bc7391de3dce11364b723cc55cf8200581c47344d5bd7b2fea56336ba789579705a944760032585ef64084c92db8200581cf01018c1d8da54c2f557679243b09af1c4dd4d9c671512b01fa5f92b8200581c6837232854849427dae7c45892032d7ded136c5beb13c68fda635d878200581cd215701e2eb17c741b9d306cba553f9fbaaca1e12a5925a065b90fa8f5d90103a100a100a36a6665655369676e65727305677369676e657273056474797065656d756c7469", hex.EncodeToString(txRaw))
 	assert.Equal(t, "371837ccfdfbf3ecdcc0fdee26c2e349aa988402bfdecd130a852d799d07bb04", txHash)
 }
+
+func Test_TxBuilder_UpdateOutputAmountAndRemoveOutput(t *testing.T) {
+	builder, err := NewTxBuilder()
+	require.NoError(t, err)
+
+	defer builder.Dispose()
+
+	builder.AddOutputs(
+		TxOutput{Addr: "0x1"},
+		TxOutput{Addr: "0x2"},
+		TxOutput{Addr: "0x3"},
+		TxOutput{Addr: "0x4"},
+	)
+
+	require.Len(t, builder.outputs, 4)
+	assert.Equal(t, uint64(0), builder.outputs[2].Amount)
+	assert.Equal(t, uint64(0), builder.outputs[3].Amount)
+
+	builder.UpdateOutputAmount(2, 200)
+	builder.UpdateOutputAmount(-1, 500)
+
+	assert.Equal(t, uint64(200), builder.outputs[2].Amount)
+	assert.Equal(t, "0x3", builder.outputs[2].Addr)
+	assert.Equal(t, uint64(500), builder.outputs[3].Amount)
+	assert.Equal(t, "0x4", builder.outputs[3].Addr)
+
+	builder.RemoveOutput(1)
+
+	require.Len(t, builder.outputs, 3)
+	assert.Equal(t, "0x1", builder.outputs[0].Addr)
+	assert.Equal(t, uint64(0), builder.outputs[0].Amount)
+	assert.Equal(t, "0x3", builder.outputs[1].Addr)
+	assert.Equal(t, uint64(200), builder.outputs[1].Amount)
+	assert.Equal(t, "0x4", builder.outputs[2].Addr)
+	assert.Equal(t, uint64(500), builder.outputs[2].Amount)
+
+	builder.RemoveOutput(0)
+
+	require.Len(t, builder.outputs, 2)
+	assert.Equal(t, "0x3", builder.outputs[0].Addr)
+	assert.Equal(t, uint64(200), builder.outputs[0].Amount)
+	assert.Equal(t, "0x4", builder.outputs[1].Addr)
+	assert.Equal(t, uint64(500), builder.outputs[1].Amount)
+
+	builder.RemoveOutput(1)
+
+	require.Len(t, builder.outputs, 1)
+	assert.Equal(t, "0x3", builder.outputs[0].Addr)
+	assert.Equal(t, uint64(200), builder.outputs[0].Amount)
+
+	builder.RemoveOutput(0)
+
+	require.Len(t, builder.outputs, 0)
+}
