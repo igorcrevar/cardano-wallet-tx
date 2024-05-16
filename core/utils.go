@@ -102,6 +102,31 @@ func WaitForAmount(ctx context.Context, txRetriever IUTxORetriever,
 	return ErrWaitForTransactionTimeout
 }
 
+// WaitForTxHashInUtxos waits until tx with txHash occurs in addr utxos
+func WaitForTxHashInUtxos(ctx context.Context, txRetriever IUTxORetriever,
+	addr string, txHash string, numRetries int, waitTime time.Duration) error {
+	for count := 0; count < numRetries; count++ {
+		utxos, err := txRetriever.GetUtxos(ctx, addr)
+		if err != nil {
+			return err
+		}
+
+		for _, x := range utxos {
+			if x.Hash == txHash {
+				return nil
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(waitTime):
+		}
+	}
+
+	return ErrWaitForTransactionTimeout
+}
+
 // VerifyWitness verifies if txHash is signed by witness
 func VerifyWitness(txHash string, witness []byte) error {
 	txHashBytes, err := hex.DecodeString(txHash)

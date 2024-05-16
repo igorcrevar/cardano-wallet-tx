@@ -18,6 +18,8 @@ import (
 )
 
 func TestIsValidCardanoAddress(t *testing.T) {
+	t.Parallel()
+
 	addresses := []string{
 		"addr_test1vp4l5ka8jaqe32kygjemg6g745lxrn0mem7fxvuarrazmesdyntms",
 		"addr_test1wpkr0wd9ggr3zmfs7a2pg845jld95nvjjzg4mnr0ewqmzmsf689u8",
@@ -56,6 +58,8 @@ func TestIsValidCardanoAddress(t *testing.T) {
 }
 
 func TestVerifyWitness(t *testing.T) {
+	t.Parallel()
+
 	var (
 		txHash         = "7e8b59e41d2ba71888272a14cff401268fa01dceb19014f5dda7763334b8f221"
 		signingKey, _  = hex.DecodeString("1217236ac24d8ac12684b308cf9468f68ef5283096896dc1c5c3caf8351e2847")
@@ -87,6 +91,8 @@ func TestVerifyWitness(t *testing.T) {
 }
 
 func TestVerifyMessage(t *testing.T) {
+	t.Parallel()
+
 	const msg = "Hello World!"
 
 	priv, pub, err := GenerateKeyPair()
@@ -100,6 +106,8 @@ func TestVerifyMessage(t *testing.T) {
 }
 
 func TestKeyHash(t *testing.T) {
+	t.Parallel()
+
 	baseDirectory, err := os.MkdirTemp("", "key-hash-test")
 	require.NoError(t, err)
 
@@ -124,6 +132,8 @@ func TestKeyHash(t *testing.T) {
 }
 
 func TestWaitForTransaction(t *testing.T) {
+	t.Parallel()
+
 	var (
 		errWait = errors.New("hello wait")
 		txInfo  = map[string]interface{}{"block": "0x1001"}
@@ -161,7 +171,9 @@ func TestWaitForTransaction(t *testing.T) {
 	require.ErrorIs(t, err, ctx.Err())
 }
 
-func TestWaitForUtxos(t *testing.T) {
+func TestWaitForAmount(t *testing.T) {
+	t.Parallel()
+
 	var (
 		errWait = errors.New("hello wait")
 		txInfo1 = []Utxo{
@@ -192,13 +204,13 @@ func TestWaitForUtxos(t *testing.T) {
 		return val.Cmp(new(big.Int).SetUint64(30)) >= 0
 	}
 
-	err := WaitForAmount(context.Background(), mock, "a", cmpHandler, 10, time.Second)
+	err := WaitForAmount(context.Background(), mock, "a", cmpHandler, 10, time.Millisecond*10)
 	require.ErrorIs(t, err, errWait)
 
-	err = WaitForAmount(context.Background(), mock, "b", cmpHandler, 10, time.Second)
+	err = WaitForAmount(context.Background(), mock, "b", cmpHandler, 10, time.Millisecond*10)
 	require.ErrorIs(t, err, ErrWaitForTransactionTimeout)
 
-	err = WaitForAmount(context.Background(), mock, "c", cmpHandler, 10, time.Second)
+	err = WaitForAmount(context.Background(), mock, "c", cmpHandler, 10, time.Millisecond*10)
 	require.NoError(t, err)
 
 	ctx, cncl := context.WithCancel(context.Background())
@@ -206,7 +218,54 @@ func TestWaitForUtxos(t *testing.T) {
 		cncl()
 	}()
 
-	err = WaitForAmount(ctx, mock, "not_exists", cmpHandler, 10, time.Second)
+	err = WaitForAmount(ctx, mock, "not_exists", cmpHandler, 1000, time.Millisecond*10)
+	require.ErrorIs(t, err, ctx.Err())
+}
+
+func TestWaitForTxHashInUtxos(t *testing.T) {
+	t.Parallel()
+
+	var (
+		errWait = errors.New("hello wait")
+		txInfo1 = []Utxo{
+			{Hash: "0x1"},
+		}
+		txInfo2 = []Utxo{
+			{Hash: "0x1"},
+			{Hash: "0x3"},
+		}
+	)
+
+	mock := &txRetrieverMock{
+		getUtxosFn: func(_ context.Context, addr string) ([]Utxo, error) {
+			switch addr {
+			case "a":
+				return nil, errWait
+			case "b":
+				return txInfo1, nil
+			case "c":
+				return txInfo2, nil
+			default:
+				return nil, nil
+			}
+		},
+	}
+
+	err := WaitForTxHashInUtxos(context.Background(), mock, "a", "0x1", 10, time.Millisecond*10)
+	require.ErrorIs(t, err, errWait)
+
+	err = WaitForTxHashInUtxos(context.Background(), mock, "b", "0x2", 10, time.Millisecond*10)
+	require.ErrorIs(t, err, ErrWaitForTransactionTimeout)
+
+	err = WaitForTxHashInUtxos(context.Background(), mock, "c", "0x3", 10, time.Millisecond*10)
+	require.NoError(t, err)
+
+	ctx, cncl := context.WithCancel(context.Background())
+	go func() {
+		cncl()
+	}()
+
+	err = WaitForTxHashInUtxos(ctx, mock, "not_exists", "0x3", 1000, time.Millisecond*10)
 	require.ErrorIs(t, err, ctx.Err())
 }
 
