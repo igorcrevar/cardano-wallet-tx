@@ -102,7 +102,8 @@ func createTx(
 		return nil, "", err
 	}
 
-	inputs, err := cardanowallet.GetUTXOsForAmount(context.Background(), txProvider, address, outputsSum+potentialFee)
+	inputs, err := cardanowallet.GetUTXOsForAmount(
+		context.Background(), txProvider, address, outputsSum+potentialFee, cardanowallet.MinUTxODefaultValue)
 	if err != nil {
 		return nil, "", err
 	}
@@ -215,12 +216,16 @@ func createMultiSigTx(
 		return nil, "", err
 	}
 
-	multiSigInputs, err := cardanowallet.GetUTXOsForAmount(context.Background(), txProvider, multiSigAddr, cardanowallet.MinUTxODefaultValue)
+	multiSigInputs, err := cardanowallet.GetUTXOsForAmount(
+		context.Background(), txProvider, multiSigAddr,
+		outputsSum, cardanowallet.MinUTxODefaultValue)
 	if err != nil {
 		return nil, "", err
 	}
 
-	multiSigFeeInputs, err := cardanowallet.GetUTXOsForAmount(context.Background(), txProvider, multiSigFeeAddr, potentialFee)
+	multiSigFeeInputs, err := cardanowallet.GetUTXOsForAmount(
+		context.Background(), txProvider, multiSigFeeAddr,
+		potentialFee, cardanowallet.MinUTxODefaultValue)
 	if err != nil {
 		return nil, "", err
 	}
@@ -347,6 +352,8 @@ func main() {
 	}
 
 	defer txProvider.Dispose()
+
+	_, _ = txProvider.GetTip(context.Background())
 
 	receiverAddr, _, err := cardanowallet.GetWalletAddress(wallets[1], testNetMagic)
 	if err != nil {

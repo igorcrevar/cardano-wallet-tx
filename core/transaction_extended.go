@@ -34,7 +34,9 @@ type TxInputs struct {
 	Sum    uint64
 }
 
-func GetUTXOsForAmount(ctx context.Context, retriever IUTxORetriever, addr string, desired uint64) (TxInputs, error) {
+func GetUTXOsForAmount(
+	ctx context.Context, retriever IUTxORetriever, addr string, desired uint64, minUtxo uint64,
+) (TxInputs, error) {
 	utxos, err := retriever.GetUtxos(ctx, addr)
 	if err != nil {
 		return TxInputs{}, err
@@ -49,61 +51,18 @@ func GetUTXOsForAmount(ctx context.Context, retriever IUTxORetriever, addr strin
 	)
 
 	for _, utxo := range utxos {
-		if utxo.Amount >= desired {
-			return TxInputs{
-				Inputs: []TxInput{
-					{
-						Hash:  utxo.Hash,
-						Index: utxo.Index,
-					},
-				},
-				Sum: utxo.Amount,
-			}, nil
-		}
-
 		amountSum += utxo.Amount
 		chosenUTXOs = append(chosenUTXOs, TxInput{
 			Hash:  utxo.Hash,
 			Index: utxo.Index,
 		})
 
-		if amountSum >= desired {
+		if amountSum == desired || amountSum >= desired+minUtxo {
 			return TxInputs{
 				Inputs: chosenUTXOs,
 				Sum:    amountSum,
 			}, nil
 		}
-	}
-
-	return TxInputs{}, fmt.Errorf(
-		"not enough funds to generate the transaction: %d available vs %d required", amountSum, desired)
-}
-
-func GetUTXOs(ctx context.Context, retriever IUTxORetriever, addr string, desired uint64) (TxInputs, error) {
-	utxos, err := retriever.GetUtxos(ctx, addr)
-	if err != nil {
-		return TxInputs{}, err
-	}
-
-	//nolint:prealloc
-	var (
-		amountSum   = uint64(0)
-		chosenUTXOs []TxInput
-	)
-
-	for _, utxo := range utxos {
-		amountSum += utxo.Amount
-		chosenUTXOs = append(chosenUTXOs, TxInput{
-			Hash:  utxo.Hash,
-			Index: utxo.Index,
-		})
-	}
-
-	if amountSum >= desired {
-		return TxInputs{
-			Inputs: chosenUTXOs,
-			Sum:    amountSum,
-		}, nil
 	}
 
 	return TxInputs{}, fmt.Errorf(
