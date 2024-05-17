@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	MinUTxODefaultValue = uint64(1000000)
+	MinUTxODefaultValue = uint64(1_000_000)
 	draftTxFile         = "tx.draft"
 )
 
@@ -48,6 +48,7 @@ type TxBuilder struct {
 	protocolParameters []byte
 	timeToLive         uint64
 	testNetMagic       uint
+	minOutputAmount    uint64
 	fee                uint64
 }
 
@@ -75,6 +76,12 @@ func (b *TxBuilder) SetTestNetMagic(testNetMagic uint) *TxBuilder {
 
 func (b *TxBuilder) SetFee(fee uint64) *TxBuilder {
 	b.fee = fee
+
+	return b
+}
+
+func (b *TxBuilder) SetMinOutputAmount(minOutputAmount uint64) *TxBuilder {
+	b.minOutputAmount = minOutputAmount
 
 	return b
 }
@@ -208,6 +215,10 @@ func (b *TxBuilder) Build() ([]byte, string, error) {
 		return nil, "", errors.New("protocol parameters not set")
 	}
 
+	if err := b.CheckOutputs(); err != nil {
+		return nil, "", err
+	}
+
 	protocolParamsFilePath := path.Join(b.baseDirectory, "protocol-parameters.json")
 	if err := os.WriteFile(protocolParamsFilePath, b.protocolParameters, FilePermission); err != nil {
 		return nil, "", err
@@ -233,6 +244,28 @@ func (b *TxBuilder) Build() ([]byte, string, error) {
 	}
 
 	return txRaw, txHash, nil
+}
+
+func (b *TxBuilder) CheckOutputs() error {
+	minAmount := b.minOutputAmount
+	if minAmount == 0 {
+		minAmount = MinUTxODefaultValue
+	}
+
+	var errs []error
+
+	for i, x := range b.outputs {
+		if x.Amount < minAmount {
+			errs = append(errs,
+				fmt.Errorf("output (%d, %s) has insufficient amount %d", i, x.Addr, x.Amount))
+		}
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+
+	return nil
 }
 
 func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error {
