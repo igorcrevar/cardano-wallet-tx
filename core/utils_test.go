@@ -169,6 +169,10 @@ func TestWaitForTransaction(t *testing.T) {
 
 	_, err = WaitForTransaction(ctx, mock, "not_exist", 10, time.Millisecond*5)
 	require.ErrorIs(t, err, ctx.Err())
+
+	_, err = WaitForTransaction(context.Background(), mock, "a",
+		10, time.Millisecond*10, func(err error) bool { return errors.Is(err, errWait) })
+	require.ErrorIs(t, err, ErrWaitForTransactionTimeout)
 }
 
 func TestWaitForAmount(t *testing.T) {
@@ -220,6 +224,10 @@ func TestWaitForAmount(t *testing.T) {
 
 	err = WaitForAmount(ctx, mock, "not_exists", cmpHandler, 1000, time.Millisecond*10)
 	require.ErrorIs(t, err, ctx.Err())
+
+	err = WaitForAmount(context.Background(), mock, "a", cmpHandler,
+		10, time.Millisecond*10, func(err error) bool { return true })
+	require.ErrorIs(t, err, ErrWaitForTransactionTimeout)
 }
 
 func TestWaitForTxHashInUtxos(t *testing.T) {
@@ -267,6 +275,10 @@ func TestWaitForTxHashInUtxos(t *testing.T) {
 
 	err = WaitForTxHashInUtxos(ctx, mock, "not_exists", "0x3", 1000, time.Millisecond*10)
 	require.ErrorIs(t, err, ctx.Err())
+
+	err = WaitForTxHashInUtxos(context.Background(), mock, "a", "0x1",
+		10, time.Millisecond*10, func(err error) bool { return true })
+	require.ErrorIs(t, err, ErrWaitForTransactionTimeout)
 }
 
 type txRetrieverMock struct {

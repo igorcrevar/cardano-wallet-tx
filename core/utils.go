@@ -18,6 +18,8 @@ import (
 
 const FilePermission = 0750
 
+type IsRecoverableErrorFn func(err error) bool
+
 var (
 	ErrInvalidSignature          = errors.New("invalid signature")
 	ErrInvalidAddressInfo        = errors.New("invalid address info")
@@ -50,27 +52,6 @@ func GetAddressInfo(address string) (AddressInfo, error) {
 	return ai, nil
 }
 
-// WaitForTransaction waits for transaction to be included in block
-func WaitForTransaction(ctx context.Context, txRetriever ITxRetriever,
-	hash string, numRetries int, waitTime time.Duration) (map[string]interface{}, error) {
-	for count := 0; count < numRetries; count++ {
-		result, err := txRetriever.GetTxByHash(ctx, hash)
-		if err != nil {
-			return nil, err
-		} else if result != nil {
-			return result, nil
-		}
-
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(waitTime):
-		}
-	}
-
-	return nil, ErrWaitForTransactionTimeout
-}
-
 // GetUtxosSum returns big.Int sum of all utxos
 func GetUtxosSum(utxos []Utxo) *big.Int {
 	sum := big.NewInt(0)
@@ -83,48 +64,49 @@ func GetUtxosSum(utxos []Utxo) *big.Int {
 
 // WaitForAmount waits for address to have amount specified by cmpHandler
 func WaitForAmount(ctx context.Context, txRetriever IUTxORetriever,
-	addr string, cmpHandler func(*big.Int) bool, numRetries int, waitTime time.Duration) error {
-	for count := 0; count < numRetries; count++ {
+	addr string, cmpHandler func(*big.Int) bool, numRetries int, waitTime time.Duration,
+	isRecoverableError ...IsRecoverableErrorFn,
+) error {
+	return ExecuteWithRetry(ctx, numRetries, waitTime, func() (bool, error) {
 		utxos, err := txRetriever.GetUtxos(ctx, addr)
-		if err != nil {
-			return err
-		} else if cmpHandler(GetUtxosSum(utxos)) {
-			return nil
-		}
 
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(waitTime):
-		}
-	}
-
-	return ErrWaitForTransactionTimeout
+		return err == nil && cmpHandler(GetUtxosSum(utxos)), err
+	}, isRecoverableError...)
 }
 
 // WaitForTxHashInUtxos waits until tx with txHash occurs in addr utxos
 func WaitForTxHashInUtxos(ctx context.Context, txRetriever IUTxORetriever,
-	addr string, txHash string, numRetries int, waitTime time.Duration) error {
-	for count := 0; count < numRetries; count++ {
+	addr string, txHash string, numRetries int, waitTime time.Duration,
+	isRecoverableError ...IsRecoverableErrorFn,
+) error {
+	return ExecuteWithRetry(ctx, numRetries, waitTime, func() (bool, error) {
 		utxos, err := txRetriever.GetUtxos(ctx, addr)
 		if err != nil {
-			return err
+			return false, err
 		}
 
 		for _, x := range utxos {
 			if x.Hash == txHash {
-				return nil
+				return true, nil
 			}
 		}
 
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(waitTime):
-		}
-	}
+		return false, nil
+	}, isRecoverableError...)
+}
 
-	return ErrWaitForTransactionTimeout
+// WaitForTransaction waits for transaction to be included in block
+func WaitForTransaction(ctx context.Context, txRetriever ITxRetriever,
+	hash string, numRetries int, waitTime time.Duration,
+	isRecoverableError ...IsRecoverableErrorFn,
+) (res map[string]interface{}, err error) {
+	err = ExecuteWithRetry(ctx, numRetries, waitTime, func() (bool, error) {
+		res, err = txRetriever.GetTxByHash(ctx, hash)
+
+		return err == nil && res != nil, err
+	}, isRecoverableError...)
+
+	return res, err
 }
 
 // VerifyWitness verifies if txHash is signed by witness
@@ -202,4 +184,30 @@ func GetKeyHash(verificationKey []byte) (string, error) {
 	}
 
 	return hex.EncodeToString(hasher.Sum(nil)), nil
+}
+
+// ExecuteWithRetry executes custom executeFn with retries if needed
+func ExecuteWithRetry(ctx context.Context,
+	numRetries int, waitTime time.Duration,
+	executeFn func() (bool, error),
+	isRecoverableError ...IsRecoverableErrorFn,
+) error {
+	for count := 0; count < numRetries; count++ {
+		stop, err := executeFn()
+		if err != nil {
+			if len(isRecoverableError) == 0 || !isRecoverableError[0](err) {
+				return err
+			}
+		} else if stop {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(waitTime):
+		}
+	}
+
+	return ErrWaitForTransactionTimeout
 }
