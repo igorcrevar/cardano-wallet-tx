@@ -26,6 +26,8 @@ func TestAddressParts(t *testing.T) {
 	wallet2, err := wm.Create(path.Join(baseDirectory, "2"), true)
 	require.NoError(t, err)
 
+	wallet3 := NewWallet(wallet1.GetVerificationKey(), wallet1.GetSigningKey(), wallet1.GetKeyHash())
+
 	wallet1KeyHash, err := GetKeyHash(wallet1.GetVerificationKey())
 	require.NoError(t, err)
 
@@ -44,7 +46,10 @@ func TestAddressParts(t *testing.T) {
 	multisigAddr, err := ps.CreateMultiSigAddress(0)
 	require.NoError(t, err)
 
-	walletAddress, _, err := GetWalletAddress(wallet1, 42)
+	walletAddress, walletStakeAddress, err := GetWalletAddress(wallet1, 42)
+	require.NoError(t, err)
+
+	wallet3Address, _, err := GetWalletAddress(wallet3, 0)
 	require.NoError(t, err)
 
 	cWalletAddress, err := NewAddress(walletAddress)
@@ -66,6 +71,19 @@ func TestAddressParts(t *testing.T) {
 
 	assert.Equal(t, multisigAddr, cMultisigAddress.String())
 	assert.Equal(t, walletAddress, cWalletAddress.String())
+
+	baseAddr, err := NewBaseAddress(TestNetNetwork, wallet1.GetVerificationKey(), wallet1.GetStakeVerificationKey())
+	require.NoError(t, err)
+
+	rewardAddr, err := NewRewardAddress(TestNetNetwork, wallet1.GetStakeVerificationKey())
+	require.NoError(t, err)
+
+	enterpriseAddr, err := NewEnterpriseAddress(MainNetNetwork, wallet1.GetVerificationKey())
+	require.NoError(t, err)
+
+	assert.Equal(t, walletAddress, baseAddr.String())
+	assert.Equal(t, wallet3Address, enterpriseAddr.String())
+	assert.Equal(t, walletStakeAddress, rewardAddr.String())
 }
 
 func TestNewAddress(t *testing.T) {

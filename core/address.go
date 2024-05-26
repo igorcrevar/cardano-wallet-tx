@@ -51,12 +51,12 @@ func NewAddressFromBytes(data []byte) (addr CardanoAddress, err error) {
 			return nil, fmt.Errorf("%w: expect %d got %d", ErrInvalidData, 1+KeyHashSize*2, len(data))
 		}
 
-		payment, err := NewStakeCredentialFromData(data[1:], header&(1<<4) > 0)
+		payment, err := NewStakeCredential(data[1:], header&(1<<4) > 0)
 		if err != nil {
 			return nil, err
 		}
 
-		stake, err := NewStakeCredentialFromData(data[1+KeyHashSize:], header&(1<<5) > 0)
+		stake, err := NewStakeCredential(data[1+KeyHashSize:], header&(1<<5) > 0)
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +74,7 @@ func NewAddressFromBytes(data []byte) (addr CardanoAddress, err error) {
 			return nil, fmt.Errorf("%w: expect at least %d got %d", ErrInvalidData, 1+KeyHashSize+1+1+1, len(data))
 		}
 
-		payment, err := NewStakeCredentialFromData(data[1:], header&(1<<4) > 0)
+		payment, err := NewStakeCredential(data[1:], header&(1<<4) > 0)
 		if err != nil {
 			return nil, err
 		}
@@ -97,7 +97,7 @@ func NewAddressFromBytes(data []byte) (addr CardanoAddress, err error) {
 			return nil, fmt.Errorf("%w: expect %d got %d", ErrInvalidData, 1+KeyHashSize, len(data))
 		}
 
-		payment, err := NewStakeCredentialFromData(data[1:], header&(1<<4) > 0)
+		payment, err := NewStakeCredential(data[1:], header&(1<<4) > 0)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +112,7 @@ func NewAddressFromBytes(data []byte) (addr CardanoAddress, err error) {
 			return nil, fmt.Errorf("%w: expect %d got %d", ErrInvalidData, 1+KeyHashSize, len(data))
 		}
 
-		stake, err := NewStakeCredentialFromData(data[1:], header&(1<<4) > 0)
+		stake, err := NewStakeCredential(data[1:], header&(1<<4) > 0)
 		if err != nil {
 			return nil, err
 		}
@@ -125,4 +125,72 @@ func NewAddressFromBytes(data []byte) (addr CardanoAddress, err error) {
 	default:
 		return nil, ErrUnsupportedAddress
 	}
+}
+
+func NewBaseAddress(
+	network CardanoNetworkType, paymentVerificationKey, stakeVerificationKey []byte,
+) (*BaseAddress, error) {
+	paymentHash, err := GetKeyHashBytes(paymentVerificationKey)
+	if err != nil {
+		return nil, err
+	}
+
+	stakeHash, err := GetKeyHashBytes(stakeVerificationKey)
+	if err != nil {
+		return nil, err
+	}
+
+	payment, err := NewStakeCredential(paymentHash, false)
+	if err != nil {
+		return nil, err
+	}
+
+	stake, err := NewStakeCredential(stakeHash, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return &BaseAddress{
+		Network: network,
+		Payment: payment,
+		Stake:   stake,
+	}, nil
+}
+
+func NewEnterpriseAddress(
+	network CardanoNetworkType, verificationKey []byte,
+) (*EnterpriseAddress, error) {
+	paymentHash, err := GetKeyHashBytes(verificationKey)
+	if err != nil {
+		return nil, err
+	}
+
+	payment, err := NewStakeCredential(paymentHash, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return &EnterpriseAddress{
+		Network: network,
+		Payment: payment,
+	}, nil
+}
+
+func NewRewardAddress(
+	network CardanoNetworkType, verificationKey []byte,
+) (*RewardAddress, error) {
+	stakeHash, err := GetKeyHashBytes(verificationKey)
+	if err != nil {
+		return nil, err
+	}
+
+	stake, err := NewStakeCredential(stakeHash, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return &RewardAddress{
+		Network: network,
+		Stake:   stake,
+	}, nil
 }

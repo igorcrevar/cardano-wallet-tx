@@ -18,6 +18,7 @@ const (
 
 	KeyHashSize    int                = 28
 	MainNetNetwork CardanoNetworkType = 1
+	TestNetNetwork CardanoNetworkType = 0
 )
 
 type CardanoAddress interface {
@@ -58,14 +59,7 @@ func (sc StakeCredential) String() string {
 	return hex.EncodeToString(sc.Payload[:])
 }
 
-func NewStakeCredential(hash [KeyHashSize]byte, typ StakeCredentialType) StakeCredential {
-	return StakeCredential{
-		Kind:    typ,
-		Payload: hash,
-	}
-}
-
-func NewStakeCredentialFromData(data []byte, isScript bool) (StakeCredential, error) {
+func NewStakeCredential(data []byte, isScript bool) (StakeCredential, error) {
 	if len(data) < KeyHashSize {
 		return StakeCredential{}, ErrInvalidData
 	}
@@ -75,10 +69,16 @@ func NewStakeCredentialFromData(data []byte, isScript bool) (StakeCredential, er
 	copy(hashBytes[:], data[:KeyHashSize])
 
 	if isScript {
-		return NewStakeCredential(hashBytes, ScriptStakeCredentialType), nil
+		return StakeCredential{
+			Kind:    ScriptStakeCredentialType,
+			Payload: hashBytes,
+		}, nil
 	}
 
-	return NewStakeCredential(hashBytes, KeyStakeCredentialType), nil
+	return StakeCredential{
+		Kind:    KeyStakeCredentialType,
+		Payload: hashBytes,
+	}, nil
 }
 
 // BaseAddress contains information of the base address.

@@ -172,18 +172,28 @@ func GenerateKeyPair() ([]byte, []byte, error) {
 	return seed, GetVerificationKeyFromSigningKey(seed), nil
 }
 
-// GetKeyHash gets Cardano key hash from verification key
-func GetKeyHash(verificationKey []byte) (string, error) {
+// GetKeyHashBytes gets Cardano key hash from verification key
+func GetKeyHashBytes(verificationKey []byte) ([]byte, error) {
 	hasher, err := blake2b.New(28, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := hasher.Write(verificationKey); err != nil {
+		return nil, err
+	}
+
+	return hasher.Sum(nil), nil
+}
+
+// GetKeyHash gets Cardano key hash string from verification key
+func GetKeyHash(verificationKey []byte) (string, error) {
+	bytes, err := GetKeyHashBytes(verificationKey)
 	if err != nil {
 		return "", err
 	}
 
-	if _, err := hasher.Write(verificationKey); err != nil {
-		return "", err
-	}
-
-	return hex.EncodeToString(hasher.Sum(nil)), nil
+	return hex.EncodeToString(bytes), nil
 }
 
 // ExecuteWithRetry executes custom executeFn with retries if needed
