@@ -118,16 +118,21 @@ func TestKeyHash(t *testing.T) {
 
 	const accountsNumber = 20
 
-	walletManager := NewStakeWalletManager()
+	walletManager := NewWalletManager()
 
 	for i := 0; i < accountsNumber; i++ {
-		wallet, err := walletManager.Create(path.Join(baseDirectory, fmt.Sprintf("a_%d", i)), true)
+		walletDir := path.Join(baseDirectory, fmt.Sprintf("a_%d", i))
+
+		wallet, err := walletManager.Create(walletDir, true)
 		require.NoError(t, err)
 
 		keyHash, err := GetKeyHash(wallet.GetVerificationKey())
 		require.NoError(t, err)
 
-		assert.Equal(t, wallet.GetKeyHash(), keyHash)
+		keyHashCli, err := GetKeyHashCli(path.Join(walletDir, verificationKeyFile))
+		require.NoError(t, err)
+
+		assert.Equal(t, keyHashCli, keyHash)
 	}
 }
 

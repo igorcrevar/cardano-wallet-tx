@@ -57,12 +57,7 @@ func (w *WalletManager) Load(directory string) (IWallet, error) {
 		return nil, err
 	}
 
-	keyHash, err := GetKeyHashCli(dir.GetVerificationKeyPath())
-	if err != nil {
-		return nil, err
-	}
-
-	return NewWallet(verificationKeyBytes, signingKeyBytes, keyHash), nil
+	return NewWallet(verificationKeyBytes, signingKeyBytes), nil
 }
 
 type StakeWalletManager struct {
@@ -131,12 +126,7 @@ func (w *StakeWalletManager) Load(directory string) (IWallet, error) {
 		return nil, err
 	}
 
-	keyHash, err := GetKeyHashCli(dir.GetVerificationKeyPath())
-	if err != nil {
-		return nil, err
-	}
-
-	return NewStakeWallet(verificationKeyBytes, signingKeyBytes, keyHash,
+	return NewStakeWallet(verificationKeyBytes, signingKeyBytes,
 		stakeVerificationKeyBytes, stakeSigningKeyBytes), nil
 }
 
@@ -175,8 +165,8 @@ func (w walletManagerDirectory) CreateDirectoryIfNotExists() error {
 	return nil
 }
 
-// GetWalletAddress returns address and stake address for wallet (if wallet is stake wallet)
-func GetWalletAddress(wallet IWallet, testNetMagic uint) (addr string, stakeAddr string, err error) {
+// GetWalletAddressCli returns address and stake address for wallet (if wallet is stake wallet)
+func GetWalletAddressCli(wallet IWallet, testNetMagic uint) (addr string, stakeAddr string, err error) {
 	baseDirectory, err := os.MkdirTemp("", "get-address")
 	if err != nil {
 		return "", "", err

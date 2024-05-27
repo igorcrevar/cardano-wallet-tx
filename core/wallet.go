@@ -11,27 +11,24 @@ import (
 type Wallet struct {
 	VerificationKey      []byte `json:"verificationKey"`
 	SigningKey           []byte `json:"signingKey"`
-	KeyHash              string `json:"keyHash"`
 	StakeVerificationKey []byte `json:"stakeVerificationKey"`
 	StakeSigningKey      []byte `json:"stakeSigningKey"`
 }
 
-func NewWallet(verificationKey []byte, signingKey []byte, keyHash string) *Wallet {
+func NewWallet(verificationKey []byte, signingKey []byte) *Wallet {
 	return &Wallet{
 		VerificationKey: verificationKey,
 		SigningKey:      signingKey,
-		KeyHash:         keyHash,
 	}
 }
 
-func NewStakeWallet(verificationKey []byte, signingKey []byte, keyHash string,
+func NewStakeWallet(verificationKey []byte, signingKey []byte,
 	stakeVerificationKey []byte, stakeSigningKey []byte) *Wallet {
 	return &Wallet{
 		StakeVerificationKey: stakeVerificationKey,
 		StakeSigningKey:      stakeSigningKey,
 		VerificationKey:      verificationKey,
 		SigningKey:           signingKey,
-		KeyHash:              keyHash,
 	}
 }
 
@@ -41,10 +38,6 @@ func (w Wallet) GetVerificationKey() []byte {
 
 func (w Wallet) GetSigningKey() []byte {
 	return w.SigningKey
-}
-
-func (w Wallet) GetKeyHash() string {
-	return w.KeyHash
 }
 
 func (w Wallet) GetStakeVerificationKey() []byte {

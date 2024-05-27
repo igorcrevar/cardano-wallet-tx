@@ -39,7 +39,7 @@ func getSplitedStr(s string, mxlen int) (res []string) {
 func getKeyHashes(wallets []cardanowallet.IWallet) []string {
 	keyHashes := make([]string, len(wallets))
 	for i, w := range wallets {
-		keyHashes[i] = w.GetKeyHash()
+		keyHashes[i], _ = cardanowallet.GetKeyHash(w.GetVerificationKey())
 	}
 
 	return keyHashes
@@ -66,10 +66,13 @@ func createTx(
 	txProvider cardanowallet.ITxProvider, wallet cardanowallet.IWallet, testNetMagic uint, potentialFee uint64,
 	receiverAddr string,
 ) ([]byte, string, error) {
-	address, _, err := cardanowallet.GetWalletAddress(wallet, testNetMagic)
+	enterptiseAddress, err := cardanowallet.NewEnterpriseAddress(
+		cardanowallet.TestNetNetwork, wallet.GetVerificationKey())
 	if err != nil {
 		return nil, "", err
 	}
+
+	address := enterptiseAddress.String()
 
 	fmt.Println("address =", address)
 
@@ -355,7 +358,7 @@ func main() {
 
 	_, _ = txProvider.GetTip(context.Background())
 
-	receiverAddr, _, err := cardanowallet.GetWalletAddress(wallets[1], testNetMagic)
+	receiverAddr, _, err := cardanowallet.GetWalletAddressCli(wallets[1], testNetMagic)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)

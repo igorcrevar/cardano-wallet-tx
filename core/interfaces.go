@@ -49,15 +49,10 @@ type ISigner interface {
 	GetVerificationKey() []byte
 }
 
-type IStakeSigner interface {
+type IWallet interface {
 	ISigner
 	GetStakeSigningKey() []byte
 	GetStakeVerificationKey() []byte
-}
-
-type IWallet interface {
-	IStakeSigner
-	GetKeyHash() string
 }
 
 type IWalletManager interface {

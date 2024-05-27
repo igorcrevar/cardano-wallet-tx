@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -166,6 +167,30 @@ func NewEnterpriseAddress(
 	}
 
 	payment, err := NewStakeCredential(paymentHash, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return &EnterpriseAddress{
+		Network: network,
+		Payment: payment,
+	}, nil
+}
+
+func NewEnterpriseAddressFromPolicyScript(
+	network CardanoNetworkType, ps *PolicyScript,
+) (*EnterpriseAddress, error) {
+	policyID, err := ps.GetPolicyID()
+	if err != nil {
+		return nil, err
+	}
+
+	scriptKeyHashBytes, err := hex.DecodeString(policyID)
+	if err != nil {
+		return nil, err
+	}
+
+	payment, err := NewStakeCredential(scriptKeyHashBytes, true)
 	if err != nil {
 		return nil, err
 	}

@@ -16,7 +16,12 @@ import (
 	"golang.org/x/crypto/blake2b"
 )
 
-const FilePermission = 0750
+const (
+	FilePermission = 0750
+
+	TestNetProtocolMagic = uint(1097911063)
+	MainNetProtocolMagic = uint(764824073)
+)
 
 type IsRecoverableErrorFn func(err error) bool
 
@@ -196,7 +201,8 @@ func GetKeyHash(verificationKey []byte) (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-// ExecuteWithRetry executes custom executeFn with retries if needed
+// ExecuteWithRetry attempts to execute the provided executeFn function multiple times
+// if the call fails with a recoverable error. It retries up to numRetries times.
 func ExecuteWithRetry(ctx context.Context,
 	numRetries int, waitTime time.Duration,
 	executeFn func() (bool, error),

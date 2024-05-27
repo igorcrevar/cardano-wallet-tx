@@ -71,6 +71,7 @@ func (ps PolicyScript) CreateMultiSigAddress(testNetMagic uint) (string, error) 
 	return strings.Trim(response, "\n"), nil
 }
 
+// GetPolicyID returns policy id (ScriptStakeCredentialType hash)
 func (ps PolicyScript) GetPolicyID() (string, error) {
 	baseDirectory, err := os.MkdirTemp("", "cardano-policy-id")
 	if err != nil {
