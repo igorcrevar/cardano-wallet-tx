@@ -27,19 +27,18 @@ func TestBech32(t *testing.T) {
 		{"abcdef1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw", nil},
 		{"11qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqc8247j", nil},
 		{"split1checkupstagehandshakeupstreamerranterredcaperred2y9e3w", nil},
-		{"split1checkupstagehandshakeupstreamerranterredcaperred2y9e2w", InvalidChecksumError{"2y9e3w", "2y9e2w"}},                                   // invalid checksum
-		{"s lit1checkupstagehandshakeupstreamerranterredcaperredp8hs2p", InvalidCharacterError(' ')},                                                 // invalid character (space) in hrp
-		{"spl" + string(rune(127)) + "t1checkupstagehandshakeupstreamerranterredcaperred2y9e3w", InvalidCharacterError(127)},                         // invalid character (DEL) in hrp
-		{"split1cheo2y9e2w", NonCharsetCharError('o')},                                                                                               // invalid character (o) in data part
-		{"split1a2y9w", InvalidSeparatorIndexError(5)},                                                                                               // too short data part
-		{"1checkupstagehandshakeupstreamerranterredcaperred2y9e3w", InvalidSeparatorIndexError(0)},                                                   // empty hrp
-		{"11qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqc8247j11qqqqqqqqqqqqqqqqqq", InvalidLengthError(111)}, // too long
+		{"split1checkupstagehandshakeupstreamerranterredcaperred2y9e2w", InvalidChecksumError{"2y9e3w", "2y9e2w"}},           // invalid checksum
+		{"s lit1checkupstagehandshakeupstreamerranterredcaperredp8hs2p", InvalidCharacterError(' ')},                         // invalid character (space) in hrp
+		{"spl" + string(rune(127)) + "t1checkupstagehandshakeupstreamerranterredcaperred2y9e3w", InvalidCharacterError(127)}, // invalid character (DEL) in hrp
+		{"split1cheo2y9e2w", NonCharsetCharError('o')},                                                                       // invalid character (o) in data part
+		{"split1a2y9w", InvalidSeparatorIndexError(5)},                                                                       // too short data part
+		{"1checkupstagehandshakeupstreamerranterredcaperred2y9e3w", InvalidSeparatorIndexError(0)},                           // empty hrp
+		{"", nil}, // too long
 
 		// Additional test vectors used in bitcoin core
 		{" 1nwldj5", InvalidCharacterError(' ')},
 		{"\x7f" + "1axkwrx", InvalidCharacterError(0x7f)},
 		{"\x801eym55h", InvalidCharacterError(0x80)},
-		{"an84characterslonghumanreadablepartthatcontainsthenumber1andtheexcludedcharactersbio1569pvx11qqqqqqqqqqqqqqqqqq", InvalidLengthError(111)},
 		{"pzry9x0s0muk", InvalidSeparatorIndexError(-1)},
 		{"1pzry9x0s0muk", InvalidSeparatorIndexError(0)},
 		{"x1b4n0q5v", NonCharsetCharError(98)},
@@ -51,6 +50,9 @@ func TestBech32(t *testing.T) {
 		{"a12UEL5L", MixedCaseError{}},
 		{"A12uEL5L", MixedCaseError{}},
 	}
+
+	tests[11].str = strings.Repeat("A", 2*256)
+	tests[11].expectedError = InvalidLengthError(2 * 256)
 
 	for i, test := range tests {
 		str := test.str

@@ -15,7 +15,7 @@ import (
 const (
 	charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
-	maxBechStrLength = 108
+	maxBechStrLength = 256
 )
 
 // gen encodes the generator polynomial for the bech32 BCH checksum.

@@ -106,6 +106,8 @@ func TestNewAddress(t *testing.T) {
 		"stake1uyehkck0lajq8gr28t9uxnuvgcqrc6070x3k9r8048z8y5gh6ffgw",
 		"stake178phkx6acpnf78fuvxn0mkew3l0fd058hzquvz7w36x4gtcccycj5",
 
+		"addr1q9d66zzs27kppmx8qc8h43q7m4hkxp5d39377lvxefvxd8j7eukjsdqc5c97t2zg5guqadepqqx6rc9m7wtnxy6tajjvk4a0kze4ljyuvvrpexg5up2sqxj33363v35gtew",
+
 		"addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3n0d3vllmyqwsx5wktcd8cc3sq835lu7drv2xwl2wywfgs68faae",
 		"addr_test1zrphkx6acpnf78fuvxn0mkew3l0fd058hzquvz7w36x4gten0d3vllmyqwsx5wktcd8cc3sq835lu7drv2xwl2wywfgsxj90mg",
 		"addr_test1yz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzerkr0vd4msrxnuwnccdxlhdjar77j6lg0wypcc9uar5d2shsf5r8qx",
@@ -122,9 +124,9 @@ func TestNewAddress(t *testing.T) {
 		addr, err := NewAddress(a)
 
 		if err == nil {
-			assert.Equal(t, i <= 9, addr.GetNetwork().IsMainNet(), "%s should be on mainnet: %v", a, i <= 9)
+			assert.Equal(t, i <= 10, addr.GetNetwork().IsMainNet(), "%s should be on mainnet: %v", a, i <= 9)
 
-			switch i % 10 {
+			switch i % 11 {
 			case 0, 1, 2, 3:
 				assert.IsType(t, &BaseAddress{}, addr)
 			case 4, 5:

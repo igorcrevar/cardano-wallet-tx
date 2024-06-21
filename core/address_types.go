@@ -9,16 +9,12 @@ import (
 // code mainly from https://github.com/fivebinaries/go-cardano-serialization/blob/master/address/address.go
 type StakeCredentialType byte
 
-type CardanoNetworkType byte
-
 const (
 	KeyStakeCredentialType StakeCredentialType = iota
 	ScriptStakeCredentialType
 	EmptyStakeCredentialType
 
-	KeyHashSize    int                = 28
-	MainNetNetwork CardanoNetworkType = 1
-	TestNetNetwork CardanoNetworkType = 0
+	KeyHashSize int = 28
 )
 
 type CardanoAddress interface {
@@ -28,26 +24,6 @@ type CardanoAddress interface {
 	GetStakePointer() StakePointer
 	Bytes() []byte
 	String() string
-}
-
-func (n CardanoNetworkType) GetPrefix() string {
-	if n == MainNetNetwork {
-		return "addr"
-	}
-
-	return "addr_test"
-}
-
-func (n CardanoNetworkType) GetStakePrefix() string {
-	if n == MainNetNetwork {
-		return "stake"
-	}
-
-	return "stake_test"
-}
-
-func (n CardanoNetworkType) IsMainNet() bool {
-	return n == MainNetNetwork
 }
 
 type StakeCredential struct {
@@ -88,6 +64,7 @@ type BaseAddress struct {
 	Network CardanoNetworkType
 	Payment StakeCredential
 	Stake   StakeCredential
+	Extra   []byte
 }
 
 func (a BaseAddress) GetPayment() StakeCredential {
@@ -107,13 +84,14 @@ func (a BaseAddress) GetStakePointer() StakePointer {
 }
 
 func (a BaseAddress) Bytes() []byte {
-	bytes := [KeyHashSize*2 + 1]byte{}
+	bytes := make([]byte, KeyHashSize*2+1+len(a.Extra))
 	bytes[0] = (byte(a.Payment.Kind) << 4) | (byte(a.Stake.Kind) << 5) | (byte(a.Network) & 0xf)
 
-	copy(bytes[1:29], a.Payment.Payload[:])
-	copy(bytes[29:], a.Stake.Payload[:])
+	copy(bytes[1:KeyHashSize+1], a.Payment.Payload[:])
+	copy(bytes[KeyHashSize+1:], a.Stake.Payload[:])
+	copy(bytes[KeyHashSize*2+1:], a.Extra)
 
-	return bytes[:]
+	return bytes
 }
 
 func (a BaseAddress) String() string {

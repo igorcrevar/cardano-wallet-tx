@@ -48,7 +48,7 @@ func NewAddressFromBytes(data []byte) (addr CardanoAddress, err error) {
 	// 0010: base address: keyhash28,scripthash28
 	// 0011: base address: scripthash28,scripthash28
 	case 0b0000, 0b0001, 0b0010, 0b0011:
-		if len(data) != 1+KeyHashSize*2 {
+		if len(data) < 1+KeyHashSize*2 {
 			return nil, fmt.Errorf("%w: expect %d got %d", ErrInvalidData, 1+KeyHashSize*2, len(data))
 		}
 
@@ -66,6 +66,7 @@ func NewAddressFromBytes(data []byte) (addr CardanoAddress, err error) {
 			Network: netID,
 			Payment: payment,
 			Stake:   stake,
+			Extra:   data[1+2*KeyHashSize:],
 		}, nil
 
 	// 0100: pointer address: keyhash28, 3 variable length uint
