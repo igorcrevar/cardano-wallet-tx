@@ -16,7 +16,7 @@ type queryLedgerStateUtxoResponseResultTransaction struct {
 }
 
 type queryLedgerStateUtxoResponseResultValueAda struct {
-	Lovelace uint `json:"lovelace"`
+	Lovelace uint64 `json:"lovelace"`
 }
 
 type queryLedgerStateUtxoResponseResultValue struct {
@@ -25,7 +25,7 @@ type queryLedgerStateUtxoResponseResultValue struct {
 
 type queryLedgerStateUtxoResponseResult struct {
 	Transaction queryLedgerStateUtxoResponseResultTransaction `json:"transaction"`
-	Index       uint                                          `json:"index"`
+	Index       uint32                                        `json:"index"`
 	Address     string                                        `json:"address"`
 	Value       queryLedgerStateUtxoResponseResultValue       `json:"value"`
 }
@@ -44,7 +44,7 @@ type queryLedgerStateProtocolParametersResponse struct {
 		MinFeeCoefficient uint `json:"minFeeCoefficient"`
 		MinFeeConstant    struct {
 			Ada struct {
-				Lovelace uint `json:"lovelace"`
+				Lovelace uint64 `json:"lovelace"`
 			} `json:"ada"`
 		} `json:"minFeeConstant"`
 		MaxBlockBodySize struct {
@@ -58,12 +58,12 @@ type queryLedgerStateProtocolParametersResponse struct {
 		} `json:"maxTransactionSize"`
 		StakeCredentialDeposit struct {
 			Ada struct {
-				Lovelace uint `json:"lovelace"`
+				Lovelace uint64 `json:"lovelace"`
 			} `json:"ada"`
 		} `json:"stakeCredentialDeposit"`
 		StakePoolDeposit struct {
 			Ada struct {
-				Lovelace uint `json:"lovelace"`
+				Lovelace uint64 `json:"lovelace"`
 			} `json:"ada"`
 		} `json:"stakePoolDeposit"`
 		StakePoolRetirementEpochBound uint   `json:"stakePoolRetirementEpochBound"`
@@ -73,12 +73,12 @@ type queryLedgerStateProtocolParametersResponse struct {
 		TreasuryExpansion             string `json:"treasuryExpansion"`
 		MinStakePoolCost              struct {
 			Ada struct {
-				Lovelace uint `json:"lovelace"`
+				Lovelace uint64 `json:"lovelace"`
 			} `json:"ada"`
 		} `json:"minStakePoolCost"`
 		MinUtxoDepositConstant struct {
 			Ada struct {
-				Lovelace uint `json:"lovelace"`
+				Lovelace uint64 `json:"lovelace"`
 			} `json:"ada"`
 		} `json:"minUtxoDepositConstant"`
 		MinUtxoDepositCoefficient uint              `json:"minUtxoDepositCoefficient"`
@@ -112,7 +112,7 @@ type queryLedgerStateTipResponse struct {
 	Jsonrpc string `json:"jsonrpc"`
 	Method  string `json:"method"`
 	Result  struct {
-		Slot uint   `json:"slot"`
+		Slot uint64 `json:"slot"`
 		ID   string `json:"id"`
 	} `json:"result"`
 	ID interface{} `json:"id"`

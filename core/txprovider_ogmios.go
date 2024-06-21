@@ -116,7 +116,7 @@ func (o *TxProviderOgmios) GetTip(ctx context.Context) (QueryTipData, error) {
 	return QueryTipData{
 		Block: heightResponse.Result,
 		Hash:  tipResponse.Result.ID,
-		Slot:  uint64(tipResponse.Result.Slot),
+		Slot:  tipResponse.Result.Slot,
 	}, nil
 }
 
@@ -139,8 +139,8 @@ func (o *TxProviderOgmios) GetUtxos(ctx context.Context, addr string) ([]Utxo, e
 	for i, utxo := range responseData.Result {
 		retVal[i] = Utxo{
 			Hash:   utxo.Transaction.ID,
-			Index:  uint32(utxo.Index),
-			Amount: uint64(utxo.Value.Ada.Lovelace),
+			Index:  utxo.Index,
+			Amount: utxo.Value.Ada.Lovelace,
 		}
 	}
 
