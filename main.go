@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"os/user"
-	"path"
 	"time"
 
 	cardanowallet "github.com/igorcrevar/cardano-wallet-tx/core"
@@ -45,26 +43,10 @@ func getKeyHashes(wallets []cardanowallet.IWallet) []string {
 	return keyHashes
 }
 
-func createWallets(walletMngr cardanowallet.IWalletManager, keyDirectory string, cnt int) ([]cardanowallet.IWallet, error) {
-	wallets := make([]cardanowallet.IWallet, cnt)
-
-	for i := 0; i < cnt; i++ {
-		fpath := fmt.Sprintf("%s%d", keyDirectory, i+1)
-
-		wallet, err := walletMngr.Create(fpath, false)
-		if err != nil {
-			return nil, err
-		}
-
-		wallets[i] = wallet
-	}
-
-	return wallets, nil
-}
-
 func createTx(
-	txProvider cardanowallet.ITxProvider, wallet cardanowallet.IWallet, testNetMagic uint, potentialFee uint64,
-	receiverAddr string,
+	cardanoCliBinary string,
+	txProvider cardanowallet.ITxProvider, wallet cardanowallet.IWallet,
+	testNetMagic uint, potentialFee uint64, receiverAddr string,
 ) ([]byte, string, error) {
 	enterptiseAddress, err := cardanowallet.NewEnterpriseAddress(
 		cardanowallet.TestNetNetwork, wallet.GetVerificationKey())
@@ -89,7 +71,7 @@ func createTx(
 	}
 	outputsSum := cardanowallet.GetOutputsSum(outputs)
 
-	builder, err := cardanowallet.NewTxBuilder()
+	builder, err := cardanowallet.NewTxBuilder(cardanoCliBinary)
 	if err != nil {
 		return nil, "", err
 	}
@@ -131,7 +113,12 @@ func createTx(
 		return nil, "", err
 	}
 
-	txSigned, err := cardanowallet.SignTx(txRaw, txHash, wallet)
+	witness, err := cardanowallet.CreateTxWitness(txHash, wallet)
+	if err != nil {
+		return nil, "", err
+	}
+
+	txSigned, err := builder.AssembleTxWitnesses(txRaw, [][]byte{witness})
 	if err != nil {
 		return nil, "", err
 	}
@@ -140,26 +127,30 @@ func createTx(
 }
 
 func createMultiSigTx(
-	txProvider cardanowallet.ITxProvider, signers []cardanowallet.IWallet,
-	feeSigners []cardanowallet.IWallet, testNetMagic uint, potentialFee uint64,
-	receiverAddr string,
+	cardanoCliBinary string, txProvider cardanowallet.ITxProvider,
+	signers []cardanowallet.IWallet, feeSigners []cardanowallet.IWallet,
+	testNetMagic uint, potentialFee uint64, receiverAddr string,
 ) ([]byte, string, error) {
-	policyScriptMultiSig, err := cardanowallet.NewPolicyScript(getKeyHashes(signers), len(signers)*2/3+1)
+	policyScriptMultiSig := cardanowallet.NewPolicyScript(getKeyHashes(signers), len(signers)*2/3+1)
+	policyScriptFeeMultiSig := cardanowallet.NewPolicyScript(getKeyHashes(feeSigners), len(signers)*2/3+1)
+	cliUtils := cardanowallet.NewCliUtils(cardanoCliBinary)
+
+	multisigPolicyID, err := cliUtils.GetPolicyID(policyScriptMultiSig)
 	if err != nil {
 		return nil, "", err
 	}
 
-	policyScriptFeeMultiSig, err := cardanowallet.NewPolicyScript(getKeyHashes(feeSigners), len(signers)*2/3+1)
+	feeMultisigPolicyID, err := cliUtils.GetPolicyID(policyScriptFeeMultiSig)
 	if err != nil {
 		return nil, "", err
 	}
 
-	multiSigAddr, err := policyScriptMultiSig.CreateMultiSigAddress(testNetMagic)
+	multiSigAddr, err := cardanowallet.NewPolicyScriptAddress(cardanowallet.TestNetNetwork, multisigPolicyID)
 	if err != nil {
 		return nil, "", err
 	}
 
-	multiSigFeeAddr, err := policyScriptFeeMultiSig.CreateMultiSigAddress(testNetMagic)
+	multiSigFeeAddr, err := cardanowallet.NewPolicyScriptAddress(cardanowallet.TestNetNetwork, feeMultisigPolicyID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -203,7 +194,7 @@ func createMultiSigTx(
 	}
 	outputsSum := cardanowallet.GetOutputsSum(outputs)
 
-	builder, err := cardanowallet.NewTxBuilder()
+	builder, err := cardanowallet.NewTxBuilder(cardanoCliBinary)
 	if err != nil {
 		return nil, "", err
 	}
@@ -220,14 +211,14 @@ func createMultiSigTx(
 	}
 
 	multiSigInputs, err := cardanowallet.GetUTXOsForAmount(
-		context.Background(), txProvider, multiSigAddr,
+		context.Background(), txProvider, multiSigAddr.String(),
 		outputsSum, cardanowallet.MinUTxODefaultValue)
 	if err != nil {
 		return nil, "", err
 	}
 
 	multiSigFeeInputs, err := cardanowallet.GetUTXOsForAmount(
-		context.Background(), txProvider, multiSigFeeAddr,
+		context.Background(), txProvider, multiSigFeeAddr.String(),
 		potentialFee, cardanowallet.MinUTxODefaultValue)
 	if err != nil {
 		return nil, "", err
@@ -235,9 +226,9 @@ func createMultiSigTx(
 
 	builder.SetMetaData(metadataBytes).SetTestNetMagic(testNetMagic)
 	builder.AddOutputs(outputs...).AddOutputs(cardanowallet.TxOutput{
-		Addr: multiSigAddr,
+		Addr: multiSigAddr.String(),
 	}).AddOutputs(cardanowallet.TxOutput{
-		Addr: multiSigFeeAddr,
+		Addr: multiSigFeeAddr.String(),
 	})
 	builder.AddInputsWithScript(policyScriptMultiSig, multiSigInputs.Inputs...)
 	builder.AddInputsWithScript(policyScriptFeeMultiSig, multiSigFeeInputs.Inputs...)
@@ -280,7 +271,7 @@ func createMultiSigTx(
 		}
 	}
 
-	txSigned, err := cardanowallet.AssembleTxWitnesses(txRaw, witnesses)
+	txSigned, err := builder.AssembleTxWitnesses(txRaw, witnesses)
 	if err != nil {
 		return nil, "", err
 	}
@@ -288,23 +279,51 @@ func createMultiSigTx(
 	return txSigned, txHash, nil
 }
 
-func createProvider(name string) (cardanowallet.ITxProvider, error) {
+func createProvider(name string, cardanoCliBinary string) (cardanowallet.ITxProvider, error) {
 	switch name {
 	case "blockfrost":
 		return cardanowallet.NewTxProviderBlockFrost(blockfrostUrl, blockfrostProjectApiKey), nil
 	case "ogmios":
 		return cardanowallet.NewTxProviderOgmios(ogmiosUrl), nil
 	default:
-		return cardanowallet.NewTxProviderCli(testNetMagic, socketPath)
+		return cardanowallet.NewTxProviderCli(testNetMagic, socketPath, cardanoCliBinary)
 	}
 }
 
-func createWalletMngr(isStake bool) cardanowallet.IWalletManager {
-	if isStake {
-		return cardanowallet.NewStakeWalletManager()
+func loadWallets() ([]cardanowallet.IWallet, error) {
+	verificationKeys := []string{
+		"582068fc463c29900b00122423c7e6a39469987786314e07a5e7f5eae76a5fe671bf",
+		"58209a9cefaa636d75dffa3a3a5ab446a191beac92b09ac82da513640e8e35935202",
+		"5820839c3bd7397f35bf55d63c0bcb3880c95ffd91e8c3bfc405a60f6c605a7a40f2",
+		"582063e95162d952d2fbc5240457750e1c13bfb4a5e3d9a96bf048b90bfe08b13de6",
+		"5820030083fd0293fc6ed8d76faf02365617066f37ad6a6d6047b801e2865914d900",
+		"5820ad5a1761213fb82a859333d78d66cf0d9dc56e413a26fe3108b5f21bac1d5fa4",
+	}
+	signingKeys := []string{
+		"58201825bce09711e1563fc1702587da6892d1d869894386323bd4378ea5e3d6cba0",
+		"5820ccdae0d1cd3fa9be16a497941acff33b9aa20bdbf2f9aa5715942d152988e083",
+		"582094bfc7d65a5d936e7b527c93ea6bf75de51029290b1ef8c8877bffe070398b40",
+		"58204cd84bf321e70ab223fbdbfe5eba249a5249bd9becbeb82109d45e56c9c610a9",
+		"58208fcc8cac6b7fedf4c30aed170633df487642cb22f7e8615684e2b98e367fcaa3",
+		"582058fb35da120c65855ad691dadf5681a2e4fc62e9dcda0d0774ff6fdc463a679a",
 	}
 
-	return cardanowallet.NewWalletManager()
+	wallets := make([]cardanowallet.IWallet, len(verificationKeys))
+	for i := range verificationKeys {
+		signingKey, err := cardanowallet.GetKeyBytes(signingKeys[i])
+		if err != nil {
+			return nil, err
+		}
+
+		verificationKey, err := cardanowallet.GetKeyBytes(verificationKeys[i])
+		if err != nil {
+			return nil, err
+		}
+
+		wallets[i] = cardanowallet.NewWallet(verificationKey, signingKey)
+	}
+
+	return wallets, nil
 }
 
 func submitTx(
@@ -336,19 +355,15 @@ func submitTx(
 }
 
 func main() {
-	currentUser, err := user.Current()
+	cardanoCliBinary := cardanowallet.ResolveCardanoCliBinary(cardanowallet.TestNetNetwork)
+
+	wallets, err := loadWallets()
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
 
-	wallets, err := createWallets(createWalletMngr(false), path.Join(currentUser.HomeDir, "cardano", "wallet_stake_"), 6)
-	if err != nil {
-		fmt.Printf("error: %v\n", err)
-		os.Exit(1)
-	}
-
-	txProvider, err := createProvider(providerName)
+	txProvider, err := createProvider(providerName, cardanoCliBinary)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
@@ -358,32 +373,35 @@ func main() {
 
 	_, _ = txProvider.GetTip(context.Background())
 
-	receiverAddr, _, err := cardanowallet.GetWalletAddressCli(wallets[1], testNetMagic)
+	receiverBaseAddr, err := cardanowallet.NewBaseAddress(
+		cardanowallet.TestNetNetwork, wallets[1].GetVerificationKey(), wallets[1].GetStakeVerificationKey())
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
 
-	multiSigTx, multiSigTxHash, err := createMultiSigTx(
-		txProvider, wallets[:3], wallets[3:], testNetMagic, potentialFee, receiverAddr)
-	if err != nil {
-		fmt.Printf("error: %v\n", err)
-		os.Exit(1)
-	}
-
-	if err := submitTx(context.Background(), txProvider, multiSigTx, multiSigTxHash, receiverAddr); err != nil {
-		fmt.Printf("error: %v\n", err)
-		os.Exit(1)
-	}
+	receiverAddr := receiverBaseAddr.String()
 
 	sigTx, txHash, err := createTx(
-		txProvider, wallets[0], testNetMagic, potentialFee, receiverAddr)
+		cardanoCliBinary, txProvider, wallets[0], testNetMagic, potentialFee, receiverAddr)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
 
 	if err := submitTx(context.Background(), txProvider, sigTx, txHash, receiverAddr); err != nil {
+		fmt.Printf("error: %v\n", err)
+		os.Exit(1)
+	}
+
+	multiSigTx, multiSigTxHash, err := createMultiSigTx(
+		cardanoCliBinary, txProvider, wallets[:3], wallets[3:], testNetMagic, potentialFee, receiverAddr)
+	if err != nil {
+		fmt.Printf("error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := submitTx(context.Background(), txProvider, multiSigTx, multiSigTxHash, receiverAddr); err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}

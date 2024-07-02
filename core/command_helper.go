@@ -7,7 +7,7 @@ import (
 	"strconv"
 )
 
-const MainnetMagic = uint(764824073)
+const FilePermission = 0750
 
 type runCommandError struct {
 	desc string
@@ -22,7 +22,7 @@ func (rce runCommandError) Error() string {
 	return rce.base.Error()
 }
 
-func resolveCardanoCliBinary() string {
+func ResolveCardanoCliBinary(_ CardanoNetworkType) string {
 	bin := os.Getenv("CARDANO_CLI_BINARY")
 	if bin != "" {
 		return bin
@@ -54,14 +54,8 @@ func runCommand(binary string, args []string, envVariables ...string) (string, e
 	return stdOutBuffer.String(), nil
 }
 
-func isFileOrDirExists(fileOrDirPath string) bool {
-	_, err := os.Stat(fileOrDirPath)
-
-	return err == nil || !os.IsNotExist(err)
-}
-
 func getTestNetMagicArgs(testnetMagic uint) []string {
-	if testnetMagic == 0 || testnetMagic == MainnetMagic {
+	if testnetMagic == 0 || testnetMagic == MainNetProtocolMagic {
 		return []string{"--mainnet"}
 	}
 

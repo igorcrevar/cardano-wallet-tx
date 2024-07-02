@@ -1,10 +1,18 @@
 package core
 
+import "strings"
+
 type CardanoNetworkType byte
 
 const (
+	TestNetProtocolMagic = uint(1097911063)
+	MainNetProtocolMagic = uint(764824073)
+
 	MainNetNetwork CardanoNetworkType = 1
 	TestNetNetwork CardanoNetworkType = 0
+
+	KeyHashSize = 28
+	KeySize     = 32
 )
 
 func (n CardanoNetworkType) GetPrefix() string {
@@ -31,4 +39,9 @@ func (n CardanoNetworkType) GetStakePrefix() string {
 
 func (n CardanoNetworkType) IsMainNet() bool {
 	return n == MainNetNetwork
+}
+
+func IsAddressWithValidPrefix(addr string) bool {
+	return strings.HasPrefix(addr, "addr") ||
+		strings.HasPrefix(addr, "stake")
 }

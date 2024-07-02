@@ -5,29 +5,31 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
 
 type TxProviderCli struct {
-	baseDirectory string
-	testNetMagic  uint
-	socketPath    string
+	baseDirectory    string
+	testNetMagic     uint
+	socketPath       string
+	cardanoCliBinary string
 }
 
 var _ ITxProvider = (*TxProviderCli)(nil)
 
-func NewTxProviderCli(testNetMagic uint, socketPath string) (*TxProviderCli, error) {
+func NewTxProviderCli(testNetMagic uint, socketPath string, cardanoCliBinary string) (*TxProviderCli, error) {
 	baseDirectory, err := os.MkdirTemp("", "cardano-txs")
 	if err != nil {
 		return nil, err
 	}
 
 	return &TxProviderCli{
-		baseDirectory: baseDirectory,
-		testNetMagic:  testNetMagic,
-		socketPath:    socketPath,
+		baseDirectory:    baseDirectory,
+		testNetMagic:     testNetMagic,
+		socketPath:       socketPath,
+		cardanoCliBinary: cardanoCliBinary,
 	}, nil
 }
 
@@ -42,7 +44,7 @@ func (b *TxProviderCli) GetProtocolParameters(_ context.Context) ([]byte, error)
 		"--socket-path", b.socketPath,
 	}, getTestNetMagicArgs(b.testNetMagic)...)
 
-	response, err := runCommand(resolveCardanoCliBinary(), args)
+	response, err := runCommand(b.cardanoCliBinary, args)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +59,7 @@ func (b *TxProviderCli) GetUtxos(_ context.Context, addr string) ([]Utxo, error)
 		"--address", addr,
 	}, getTestNetMagicArgs(b.testNetMagic)...)
 
-	output, err := runCommand(resolveCardanoCliBinary(), args)
+	output, err := runCommand(b.cardanoCliBinary, args)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +109,7 @@ func (b *TxProviderCli) GetTip(_ context.Context) (QueryTipData, error) {
 		"--socket-path", b.socketPath,
 	}, getTestNetMagicArgs(b.testNetMagic)...)
 
-	res, err := runCommand(resolveCardanoCliBinary(), args)
+	res, err := runCommand(b.cardanoCliBinary, args)
 	if err != nil {
 		return QueryTipData{}, err
 	}
@@ -122,7 +124,7 @@ func (b *TxProviderCli) GetTip(_ context.Context) (QueryTipData, error) {
 }
 
 func (b *TxProviderCli) SubmitTx(_ context.Context, txSigned []byte) error {
-	txFilePath := path.Join(b.baseDirectory, "tx.send")
+	txFilePath := filepath.Join(b.baseDirectory, "tx.send")
 
 	txBytes, err := TransactionWitnessedRaw(txSigned).ToJSON()
 	if err != nil {
@@ -139,7 +141,7 @@ func (b *TxProviderCli) SubmitTx(_ context.Context, txSigned []byte) error {
 		"--tx-file", txFilePath,
 	}, getTestNetMagicArgs(b.testNetMagic)...)
 
-	res, err := runCommand(resolveCardanoCliBinary(), args)
+	res, err := runCommand(b.cardanoCliBinary, args)
 	if err != nil {
 		return err
 	}

@@ -1,133 +1,91 @@
 package core
 
 import (
+	"encoding/hex"
 	"encoding/json"
-	"os"
-	"path"
-	"strings"
+	"fmt"
 )
 
-type keyHashSig struct {
-	Type    string `json:"type"`
-	KeyHash string `json:"keyHash"`
-}
+const (
+	PolicyScriptAtLeastType = "atLeast"
+	PolicyScriptSigType     = "sig"
+)
 
 type PolicyScript struct {
-	PolicyScript []byte `json:"ps"`
-	Count        int    `json:"cnt"`
+	Type string `json:"type"`
+
+	Required int            `json:"required,omitempty"`
+	Scripts  []PolicyScript `json:"scripts,omitempty"`
+
+	KeyHash string `json:"keyHash,omitempty"`
+	Slot    uint64 `json:"slot,omitempty"`
 }
 
-func NewPolicyScript(keyHashes []string, atLeastSignersCount int) (*PolicyScript, error) {
-	policyScript, err := createPolicyScript(keyHashes, atLeastSignersCount)
-	if err != nil {
-		return nil, err
+func NewPolicyScript(keyHashes []string, atLeastSignersCount int) *PolicyScript {
+	scripts := make([]PolicyScript, len(keyHashes))
+	for i, keyHash := range keyHashes {
+		scripts[i] = PolicyScript{
+			Type:    PolicyScriptSigType,
+			KeyHash: keyHash,
+		}
 	}
 
 	return &PolicyScript{
-		PolicyScript: policyScript,
-		Count:        len(keyHashes),
-	}, nil
+		Type:     PolicyScriptAtLeastType,
+		Required: atLeastSignersCount,
+		Scripts:  scripts,
+	}
 }
 
-func NewPolicyScriptFromKeyHash(keyHash string) (*PolicyScript, error) {
-	policyScript, err := json.MarshalIndent(keyHashSig{
-		Type:    "sig",
-		KeyHash: keyHash,
-	}, "", "  ")
-	if err != nil {
-		return nil, err
-	}
-
-	return &PolicyScript{
-		PolicyScript: policyScript,
-		Count:        1,
-	}, nil
-}
-
-func (ps PolicyScript) CreateMultiSigAddress(testNetMagic uint) (string, error) {
-	baseDirectory, err := os.MkdirTemp("", "cardano-multisig-addr")
-	if err != nil {
-		return "", err
-	}
-
-	defer func() {
-		os.RemoveAll(baseDirectory)
-		os.Remove(baseDirectory)
-	}()
-
-	policyScriptFilePath := path.Join(baseDirectory, "policy-script.json")
-	if err := os.WriteFile(policyScriptFilePath, ps.PolicyScript, FilePermission); err != nil {
-		return "", err
-	}
-
-	response, err := runCommand(resolveCardanoCliBinary(), append([]string{
-		"address", "build",
-		"--payment-script-file", policyScriptFilePath,
-	}, getTestNetMagicArgs(testNetMagic)...))
-	if err != nil {
-		return "", err
-	}
-
-	return strings.Trim(response, "\n"), nil
-}
-
-// GetPolicyID returns policy id (ScriptStakeCredentialType hash)
-func (ps PolicyScript) GetPolicyID() (string, error) {
-	baseDirectory, err := os.MkdirTemp("", "cardano-policy-id")
-	if err != nil {
-		return "", err
-	}
-
-	defer func() {
-		os.RemoveAll(baseDirectory)
-		os.Remove(baseDirectory)
-	}()
-
-	policyScriptFilePath := path.Join(baseDirectory, "policy-script.json")
-	if err := os.WriteFile(policyScriptFilePath, ps.PolicyScript, FilePermission); err != nil {
-		return "", err
-	}
-
-	return getPolicyID(policyScriptFilePath)
-}
-
-func (ps PolicyScript) GetPolicyScript() []byte {
-	return ps.PolicyScript
+func (ps PolicyScript) GetPolicyScriptJSON() ([]byte, error) {
+	return json.MarshalIndent(ps, "", "  ")
 }
 
 func (ps PolicyScript) GetCount() int {
-	return ps.Count
+	cnt := 0
+
+	for _, x := range ps.Scripts {
+		if x.Type == PolicyScriptSigType {
+			cnt++
+		}
+	}
+
+	return cnt
 }
 
-func createPolicyScript(keyHashes []string, atLeastSignersCount int) ([]byte, error) {
-	type policyScript struct {
-		Type     string       `json:"type"`
-		Required int          `json:"required"`
-		Scripts  []keyHashSig `json:"scripts"`
+// GetAddress returns address for this policy script
+func NewPolicyScriptAddress(
+	networkID CardanoNetworkType, policyID string, policyIDStake ...string,
+) (CardanoAddress, error) {
+	getStakeCredential := func(pid string) (StakeCredential, error) {
+		keyHash, err := hex.DecodeString(pid)
+		if err != nil {
+			return StakeCredential{}, fmt.Errorf("failed to decode policy id: %w", err)
+		}
+
+		return NewStakeCredential(keyHash, true)
 	}
 
-	p := policyScript{
-		Type:     "atLeast",
-		Required: atLeastSignersCount,
-	}
-
-	for _, keyHash := range keyHashes {
-		p.Scripts = append(p.Scripts, keyHashSig{
-			Type:    "sig",
-			KeyHash: keyHash,
-		})
-	}
-
-	return json.MarshalIndent(p, "", "  ")
-}
-
-func getPolicyID(policyScriptFilePath string) (string, error) {
-	response, err := runCommand(resolveCardanoCliBinary(), []string{
-		"transaction", "policyid", "--script-file", policyScriptFilePath,
-	})
+	payment, err := getStakeCredential(policyID)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return strings.Trim(response, "\n"), nil
+	if len(policyIDStake) == 0 {
+		return &EnterpriseAddress{
+			Network: networkID,
+			Payment: payment,
+		}, nil
+	}
+
+	stake, err := getStakeCredential(policyIDStake[0])
+	if err != nil {
+		return nil, err
+	}
+
+	return &BaseAddress{
+		Network: networkID,
+		Payment: payment,
+		Stake:   stake,
+	}, nil
 }

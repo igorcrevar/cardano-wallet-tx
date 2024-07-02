@@ -1,8 +1,6 @@
 package core
 
 import (
-	"os"
-	"path"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,25 +8,12 @@ import (
 )
 
 func TestAddressParts(t *testing.T) {
-	baseDirectory, err := os.MkdirTemp("", "address-key-hash-test")
-	require.NoError(t, err)
-
-	defer func() {
-		os.RemoveAll(baseDirectory)
-		os.Remove(baseDirectory)
-	}()
-
-	wm := NewStakeWalletManager()
-	wallet1Dir := path.Join(baseDirectory, "1")
-	wallet2Dir := path.Join(baseDirectory, "2")
-
-	wallet1, err := wm.Create(wallet1Dir, true)
-	require.NoError(t, err)
-
-	wallet2, err := wm.Create(wallet2Dir, true)
+	wallet1, err := GenerateWallet(true)
 	require.NoError(t, err)
 
 	wallet3 := NewWallet(wallet1.GetVerificationKey(), wallet1.GetSigningKey())
+
+	cliUtils := NewCliUtils(ResolveCardanoCliBinary(TestNetNetwork))
 
 	wallet1KeyHash, err := GetKeyHash(wallet1.GetVerificationKey())
 	require.NoError(t, err)
@@ -36,28 +21,13 @@ func TestAddressParts(t *testing.T) {
 	wallet1StakeKeyHash, err := GetKeyHash(wallet1.GetStakeVerificationKey())
 	require.NoError(t, err)
 
-	wallet2KeyHash, err := GetKeyHash(wallet2.GetVerificationKey())
+	walletAddress, walletStakeAddress, err := cliUtils.GetWalletAddress(wallet1, TestNetProtocolMagic)
 	require.NoError(t, err)
 
-	ps, err := NewPolicyScript([]string{wallet1KeyHash, wallet2KeyHash}, 1)
-	require.NoError(t, err)
-
-	multisigPolicyID, err := ps.GetPolicyID()
-	require.NoError(t, err)
-
-	multisigAddr, err := ps.CreateMultiSigAddress(0)
-	require.NoError(t, err)
-
-	walletAddress, walletStakeAddress, err := GetWalletAddressCli(wallet1, 42)
-	require.NoError(t, err)
-
-	wallet3Address, _, err := GetWalletAddressCli(wallet3, 0)
+	wallet3Address, _, err := cliUtils.GetWalletAddress(wallet3, 0)
 	require.NoError(t, err)
 
 	cWalletAddress, err := NewAddress(walletAddress)
-	require.NoError(t, err)
-
-	cMultisigAddress, err := NewAddress(multisigAddr)
 	require.NoError(t, err)
 
 	assert.Equal(t, wallet1KeyHash, cWalletAddress.GetPayment().String())
@@ -66,12 +36,6 @@ func TestAddressParts(t *testing.T) {
 	assert.Equal(t, KeyStakeCredentialType, cWalletAddress.GetPayment().Kind)
 	assert.Equal(t, KeyStakeCredentialType, cWalletAddress.GetStake().Kind)
 
-	assert.True(t, cMultisigAddress.GetNetwork().IsMainNet())
-	assert.Equal(t, ScriptStakeCredentialType, cMultisigAddress.GetPayment().Kind)
-	assert.Equal(t, multisigPolicyID, cMultisigAddress.GetPayment().String())
-	assert.Equal(t, EmptyStakeCredentialType, cMultisigAddress.GetStake().Kind)
-
-	assert.Equal(t, multisigAddr, cMultisigAddress.String())
 	assert.Equal(t, walletAddress, cWalletAddress.String())
 
 	baseAddr, err := NewBaseAddress(TestNetNetwork, wallet1.GetVerificationKey(), wallet1.GetStakeVerificationKey())
@@ -86,11 +50,6 @@ func TestAddressParts(t *testing.T) {
 	assert.Equal(t, walletAddress, baseAddr.String())
 	assert.Equal(t, wallet3Address, enterpriseAddr.String())
 	assert.Equal(t, walletStakeAddress, rewardAddr.String())
-
-	enterpriseAddr2, err := NewEnterpriseAddressFromPolicyScript(MainNetNetwork, ps)
-	require.NoError(t, err)
-
-	assert.Equal(t, multisigAddr, enterpriseAddr2.String())
 }
 
 func TestNewAddress(t *testing.T) {
@@ -122,6 +81,7 @@ func TestNewAddress(t *testing.T) {
 
 	for i, a := range addresses {
 		addr, err := NewAddress(a)
+		assert.NoError(t, err, "%s has error: %v", a, err)
 
 		if err == nil {
 			assert.Equal(t, i <= 10, addr.GetNetwork().IsMainNet(), "%s should be on mainnet: %v", a, i <= 9)
@@ -138,8 +98,6 @@ func TestNewAddress(t *testing.T) {
 			}
 
 			assert.Equal(t, a, addr.String())
-		} else {
-			assert.NoError(t, err, "%s has error: %v", a, err)
 		}
 	}
 }

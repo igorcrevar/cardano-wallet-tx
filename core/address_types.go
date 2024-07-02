@@ -13,8 +13,6 @@ const (
 	KeyStakeCredentialType StakeCredentialType = iota
 	ScriptStakeCredentialType
 	EmptyStakeCredentialType
-
-	KeyHashSize int = 28
 )
 
 type CardanoAddress interface {

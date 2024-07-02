@@ -1,15 +1,12 @@
 package core
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
-
-	"github.com/fxamacker/cbor/v2"
 )
 
 const (
@@ -50,16 +47,18 @@ type TxBuilder struct {
 	testNetMagic       uint
 	minOutputAmount    uint64
 	fee                uint64
+	cardanoCliBinary   string
 }
 
-func NewTxBuilder() (*TxBuilder, error) {
+func NewTxBuilder(cardanoCliBinary string) (*TxBuilder, error) {
 	baseDirectory, err := os.MkdirTemp("", "cardano-txs")
 	if err != nil {
 		return nil, err
 	}
 
 	return &TxBuilder{
-		baseDirectory: baseDirectory,
+		baseDirectory:    baseDirectory,
+		cardanoCliBinary: cardanoCliBinary,
 	}, nil
 }
 
@@ -173,7 +172,7 @@ func (b *TxBuilder) CalculateFee(witnessCount int) (uint64, error) {
 		return 0, errors.New("protocol parameters not set")
 	}
 
-	protocolParamsFilePath := path.Join(b.baseDirectory, "protocol-parameters.json")
+	protocolParamsFilePath := filepath.Join(b.baseDirectory, "protocol-parameters.json")
 	if err := os.WriteFile(protocolParamsFilePath, b.protocolParameters, FilePermission); err != nil {
 		return 0, err
 	}
@@ -194,9 +193,9 @@ func (b *TxBuilder) CalculateFee(witnessCount int) (uint64, error) {
 		}
 	}
 
-	feeOutput, err := runCommand(resolveCardanoCliBinary(), append([]string{
+	feeOutput, err := runCommand(b.cardanoCliBinary, append([]string{
 		"transaction", "calculate-min-fee",
-		"--tx-body-file", path.Join(b.baseDirectory, draftTxFile),
+		"--tx-body-file", filepath.Join(b.baseDirectory, draftTxFile),
 		"--tx-in-count", strconv.Itoa(len(b.inputs)),
 		"--tx-out-count", strconv.Itoa(len(b.outputs)),
 		"--witness-count", strconv.FormatUint(uint64(witnessCount), 10),
@@ -219,7 +218,7 @@ func (b *TxBuilder) Build() ([]byte, string, error) {
 		return nil, "", err
 	}
 
-	protocolParamsFilePath := path.Join(b.baseDirectory, "protocol-parameters.json")
+	protocolParamsFilePath := filepath.Join(b.baseDirectory, "protocol-parameters.json")
 	if err := os.WriteFile(protocolParamsFilePath, b.protocolParameters, FilePermission); err != nil {
 		return nil, "", err
 	}
@@ -228,7 +227,7 @@ func (b *TxBuilder) Build() ([]byte, string, error) {
 		return nil, "", err
 	}
 
-	bytes, err := os.ReadFile(path.Join(b.baseDirectory, draftTxFile))
+	bytes, err := os.ReadFile(filepath.Join(b.baseDirectory, draftTxFile))
 	if err != nil {
 		return nil, "", err
 	}
@@ -238,7 +237,7 @@ func (b *TxBuilder) Build() ([]byte, string, error) {
 		return nil, "", err
 	}
 
-	txHash, err := getTxHash(txRaw, b.baseDirectory)
+	txHash, err := NewCliUtils(b.cardanoCliBinary).getTxHash(txRaw, b.baseDirectory)
 	if err != nil {
 		return nil, "", err
 	}
@@ -274,11 +273,11 @@ func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error 
 		"--protocol-params-file", protocolParamsFilePath,
 		"--fee", strconv.FormatUint(fee, 10),
 		"--invalid-hereafter", strconv.FormatUint(b.timeToLive, 10),
-		"--out-file", path.Join(b.baseDirectory, draftTxFile),
+		"--out-file", filepath.Join(b.baseDirectory, draftTxFile),
 	}
 
 	if b.metadata != nil {
-		metaDataFilePath := path.Join(b.baseDirectory, "metadata.json")
+		metaDataFilePath := filepath.Join(b.baseDirectory, "metadata.json")
 		if err := os.WriteFile(metaDataFilePath, b.metadata, FilePermission); err != nil {
 			return err
 		}
@@ -290,8 +289,13 @@ func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error 
 		args = append(args, "--tx-in", inp.Input.String())
 
 		if inp.PolicyScript != nil {
-			policyFilePath := path.Join(b.baseDirectory, fmt.Sprintf("policy_%d.json", i))
-			if err := os.WriteFile(policyFilePath, inp.PolicyScript.GetPolicyScript(), FilePermission); err != nil {
+			policyScriptJSON, err := inp.PolicyScript.GetPolicyScriptJSON()
+			if err != nil {
+				return err
+			}
+
+			policyFilePath := filepath.Join(b.baseDirectory, fmt.Sprintf("policy_%d.json", i))
+			if err := os.WriteFile(policyFilePath, policyScriptJSON, FilePermission); err != nil {
 				return err
 			}
 
@@ -303,57 +307,19 @@ func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error 
 		args = append(args, "--tx-out", out.String())
 	}
 
-	_, err := runCommand(resolveCardanoCliBinary(), args)
+	_, err := runCommand(b.cardanoCliBinary, args)
 
 	return err
 }
 
-// SignTx creates witness and assembles it to final tx
-func SignTx(txRaw []byte, txHash string, wallet ISigner) ([]byte, error) {
-	witness, err := CreateTxWitness(txHash, wallet)
-	if err != nil {
-		return nil, err
-	}
-
-	return AssembleTxWitnesses(txRaw, [][]byte{witness})
-}
-
-// CreateTxWitness signs transaction hash and creates witness cbor
-func CreateTxWitness(txHash string, wallet ISigner) ([]byte, error) {
-	txHashBytes, err := hex.DecodeString(txHash)
-	if err != nil {
-		return nil, err
-	}
-
-	result, err := SignMessage(wallet.GetSigningKey(), wallet.GetVerificationKey(), txHashBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return cbor.Marshal([][]byte{
-		wallet.GetVerificationKey(),
-		result,
-	})
-}
-
 // AssembleTxWitnesses assembles final signed transaction
-func AssembleTxWitnesses(txRaw []byte, witnesses [][]byte) ([]byte, error) {
-	baseDirectory, err := os.MkdirTemp("", "assemble-txs")
-	if err != nil {
-		return nil, err
-	}
-
-	defer func() {
-		os.RemoveAll(baseDirectory)
-		os.Remove(baseDirectory)
-	}()
-
-	outFilePath := path.Join(baseDirectory, "tx.sig")
-	txFilePath := path.Join(baseDirectory, "tx.raw")
+func (b *TxBuilder) AssembleTxWitnesses(txRaw []byte, witnesses [][]byte) ([]byte, error) {
+	outFilePath := filepath.Join(b.baseDirectory, "tx.sig")
+	txFilePath := filepath.Join(b.baseDirectory, "tx.raw")
 	witnessesFilePaths := make([]string, len(witnesses))
 
 	for i, witness := range witnesses {
-		witnessesFilePaths[i] = path.Join(baseDirectory, fmt.Sprintf("witness-%d", i+1))
+		witnessesFilePaths[i] = filepath.Join(b.baseDirectory, fmt.Sprintf("witness-%d", i+1))
 
 		content, err := TxWitnessRaw(witness).ToJSON()
 		if err != nil {
@@ -383,7 +349,7 @@ func AssembleTxWitnesses(txRaw []byte, witnesses [][]byte) ([]byte, error) {
 		args = append(args, "--witness-file", fp)
 	}
 
-	if _, err = runCommand(resolveCardanoCliBinary(), args); err != nil {
+	if _, err = runCommand(b.cardanoCliBinary, args); err != nil {
 		return nil, err
 	}
 
@@ -393,43 +359,4 @@ func AssembleTxWitnesses(txRaw []byte, witnesses [][]byte) ([]byte, error) {
 	}
 
 	return NewTransactionWitnessedRawFromJSON(bytes)
-}
-
-// GetTxHash gets hash from transaction cbor slice
-func GetTxHash(txRaw []byte) (string, error) {
-	baseDirectory, err := os.MkdirTemp("", "get-txhash")
-	if err != nil {
-		return "", err
-	}
-
-	defer func() {
-		os.RemoveAll(baseDirectory)
-		os.Remove(baseDirectory)
-	}()
-
-	return getTxHash(txRaw, baseDirectory)
-}
-
-func getTxHash(txRaw []byte, baseDirectory string) (string, error) {
-	txFilePath := path.Join(baseDirectory, "tx.tmp")
-
-	txBytes, err := TransactionUnwitnessedRaw(txRaw).ToJSON()
-	if err != nil {
-		return "", err
-	}
-
-	if err := os.WriteFile(txFilePath, txBytes, FilePermission); err != nil {
-		return "", err
-	}
-
-	args := []string{
-		"transaction", "txid",
-		"--tx-body-file", txFilePath}
-
-	res, err := runCommand(resolveCardanoCliBinary(), args)
-	if err != nil {
-		return "", err
-	}
-
-	return strings.Trim(res, "\n"), err
 }

@@ -55,14 +55,7 @@ type IWallet interface {
 	GetStakeVerificationKey() []byte
 }
 
-type IWalletManager interface {
-	// Create creates new wallet
-	Create(directory string, forceCreate bool) (IWallet, error)
-	// Load loads wallet
-	Load(directory string) (IWallet, error)
-}
-
 type IPolicyScript interface {
-	GetPolicyScript() []byte
+	GetPolicyScriptJSON() ([]byte, error)
 	GetCount() int
 }

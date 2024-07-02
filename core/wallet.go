@@ -8,11 +8,23 @@ import (
 	"github.com/fxamacker/cbor/v2"
 )
 
+const (
+	StakeSigningKeyShelley          = "StakeSigningKeyShelley_ed25519"
+	StakeSigningKeyShelleyDesc      = "Stake Signing Key"
+	StakeVerificationKeyShelley     = "StakeVerificationKeyShelley_ed25519"
+	StakeVerificationKeyShelleyDesc = "Stake Verification Key"
+
+	PaymentSigningKeyShelley          = "PaymentSigningKeyShelley_ed25519"
+	PaymentSigningKeyShelleyDesc      = "Payment Signing Key"
+	PaymentVerificationKeyShelley     = "PaymentVerificationKeyShelley_ed25519"
+	PaymentVerificationKeyShelleyDesc = "Payment Verification Key"
+)
+
 type Wallet struct {
-	VerificationKey      []byte `json:"verificationKey"`
-	SigningKey           []byte `json:"signingKey"`
-	StakeVerificationKey []byte `json:"stakeVerificationKey"`
-	StakeSigningKey      []byte `json:"stakeSigningKey"`
+	VerificationKey      []byte `json:"vkey"`
+	SigningKey           []byte `json:"skey"`
+	StakeVerificationKey []byte `json:"vstake"`
+	StakeSigningKey      []byte `json:"sstake"`
 }
 
 func NewWallet(verificationKey []byte, signingKey []byte) *Wallet {
@@ -83,18 +95,7 @@ func NewKeyFromBytes(keyType string, desc string, bytes []byte) (Key, error) {
 }
 
 func (k Key) GetKeyBytes() ([]byte, error) {
-	bytes, err := hex.DecodeString(k.Hex)
-	if err != nil {
-		return nil, err
-	}
-
-	var result []byte
-
-	if err := cbor.Unmarshal(bytes, &result); err != nil {
-		return nil, err
-	}
-
-	return result, nil
+	return GetKeyBytes(k.Hex)
 }
 
 func (k Key) WriteToFile(filePath string) error {
@@ -108,38 +109,4 @@ func (k Key) WriteToFile(filePath string) error {
 	}
 
 	return nil
-}
-
-func SaveKeyBytesToFile(keyBytes []byte, filePath string, isSigningKey bool, isStakeKey bool) error {
-	var title, desc string
-
-	if isStakeKey {
-		if isSigningKey {
-			title, desc = "StakeSigningKeyShelley_ed25519", "Stake Signing Key"
-		} else {
-			title, desc = "StakeVerificationKeyShelley_ed25519", "Stake Verification Key"
-		}
-	} else {
-		if isSigningKey {
-			title, desc = "PaymentSigningKeyShelley_ed25519", "Payment Signing Key"
-		} else {
-			title, desc = "PaymentVerificationKeyShelley_ed25519", "Payment Verification Key"
-		}
-	}
-
-	key, err := NewKeyFromBytes(title, desc, keyBytes)
-	if err != nil {
-		return err
-	}
-
-	return key.WriteToFile(filePath)
-}
-
-func getKeyBytes(filePath string) ([]byte, error) {
-	key, err := NewKey(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	return key.GetKeyBytes()
 }

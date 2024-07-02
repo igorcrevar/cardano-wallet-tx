@@ -68,11 +68,3 @@ func GetUTXOsForAmount(
 	return TxInputs{}, fmt.Errorf(
 		"not enough funds to generate the transaction: %d available vs %d required", amountSum, desired)
 }
-
-func GetOutputsSum(outputs []TxOutput) (receiversSum uint64) {
-	for _, x := range outputs {
-		receiversSum += x.Amount
-	}
-
-	return receiversSum
-}
