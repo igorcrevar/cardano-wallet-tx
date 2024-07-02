@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"os"
 	"time"
 
@@ -334,7 +333,7 @@ func submitTx(
 		return err
 	}
 
-	prev := cardanowallet.GetUtxosSum(utxo)
+	expectedAtLeast := cardanowallet.GetUtxosSum(utxo) + cardanowallet.MinUTxODefaultValue
 
 	if err := txProvider.SubmitTx(context.Background(), txRaw); err != nil {
 		return err
@@ -342,8 +341,8 @@ func submitTx(
 
 	fmt.Println("transaction has been submitted. hash =", txHash)
 
-	err = cardanowallet.WaitForAmount(ctx, txProvider, addr, func(val *big.Int) bool {
-		return prev.Cmp(val) < 0
+	err = cardanowallet.WaitForAmount(ctx, txProvider, addr, func(val uint64) bool {
+		return val >= expectedAtLeast
 	}, 60, time.Second*5)
 	if err != nil {
 		return err

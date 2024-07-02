@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"errors"
-	"math/big"
 	"time"
 )
 
@@ -12,10 +11,9 @@ type IsRecoverableErrorFn func(err error) bool
 var ErrWaitForTransactionTimeout = errors.New("timeout while waiting for transaction")
 
 // GetUtxosSum returns sum of all utxos
-func GetUtxosSum(utxos []Utxo) *big.Int {
-	sum := big.NewInt(0)
+func GetUtxosSum(utxos []Utxo) (sum uint64) {
 	for _, utxo := range utxos {
-		sum.Add(sum, new(big.Int).SetUint64(utxo.Amount))
+		sum += utxo.Amount
 	}
 
 	return sum
@@ -32,7 +30,7 @@ func GetOutputsSum(outputs []TxOutput) (receiversSum uint64) {
 
 // WaitForAmount waits for address to have amount specified by cmpHandler
 func WaitForAmount(ctx context.Context, txRetriever IUTxORetriever,
-	addr string, cmpHandler func(*big.Int) bool, numRetries int, waitTime time.Duration,
+	addr string, cmpHandler func(uint64) bool, numRetries int, waitTime time.Duration,
 	isRecoverableError ...IsRecoverableErrorFn,
 ) error {
 	return ExecuteWithRetry(ctx, numRetries, waitTime, func() (bool, error) {

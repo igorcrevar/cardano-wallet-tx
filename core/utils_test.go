@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"errors"
-	"math/big"
 	"testing"
 	"time"
 
@@ -83,8 +82,8 @@ func TestWaitForAmount(t *testing.T) {
 		},
 	}
 
-	cmpHandler := func(val *big.Int) bool {
-		return val.Cmp(new(big.Int).SetUint64(30)) >= 0
+	cmpHandler := func(val uint64) bool {
+		return val >= 30
 	}
 
 	err := WaitForAmount(context.Background(), mock, "a", cmpHandler, 10, time.Millisecond*10)
