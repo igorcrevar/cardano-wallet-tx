@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
 )
 
 const (
@@ -29,6 +30,10 @@ func NewPolicyScript(keyHashes []string, atLeastSignersCount int) *PolicyScript 
 			KeyHash: keyHash,
 		}
 	}
+
+	sort.Slice(scripts, func(i, j int) bool {
+		return scripts[i].KeyHash < scripts[j].KeyHash
+	})
 
 	return &PolicyScript{
 		Type:     PolicyScriptAtLeastType,

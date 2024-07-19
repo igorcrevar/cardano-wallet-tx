@@ -25,9 +25,15 @@ func TestPolicyScript(t *testing.T) {
 
 	ps := NewPolicyScript(keyHashes[:4], 4)
 	psStake := NewPolicyScript(keyHashes[4:], 1)
+	psDifferentOrder := NewPolicyScript(append([]string{}, keyHashes[1], keyHashes[0], keyHashes[3], keyHashes[2]), 4)
 
 	policyID, err := cliUtils.GetPolicyID(ps)
 	require.NoError(t, err)
+
+	policyIDDifferentOrder, err := cliUtils.GetPolicyID(psDifferentOrder)
+	require.NoError(t, err)
+
+	require.Equal(t, policyID, policyIDDifferentOrder)
 
 	policyIDStake, err := cliUtils.GetPolicyID(psStake)
 	require.NoError(t, err)
