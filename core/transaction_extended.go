@@ -35,7 +35,7 @@ type TxInputs struct {
 }
 
 func GetUTXOsForAmount(
-	ctx context.Context, retriever IUTxORetriever, addr string, desired uint64, minUtxo uint64,
+	ctx context.Context, retriever IUTxORetriever, addr string, exactSum uint64, atLeastSum uint64,
 ) (TxInputs, error) {
 	utxos, err := retriever.GetUtxos(ctx, addr)
 	if err != nil {
@@ -57,7 +57,7 @@ func GetUTXOsForAmount(
 			Index: utxo.Index,
 		})
 
-		if amountSum == desired || amountSum >= desired+minUtxo {
+		if amountSum == exactSum || amountSum >= atLeastSum {
 			return TxInputs{
 				Inputs: chosenUTXOs,
 				Sum:    amountSum,
@@ -65,6 +65,6 @@ func GetUTXOsForAmount(
 		}
 	}
 
-	return TxInputs{}, fmt.Errorf(
-		"not enough funds to generate the transaction: %d available vs %d required", amountSum, desired)
+	return TxInputs{}, fmt.Errorf("not enough funds for the transaction: (available, exact, at least) = (%d, %d, %d)",
+		amountSum, exactSum, atLeastSum)
 }
