@@ -87,7 +87,9 @@ func createTx(
 	}
 
 	inputs, err := cardanowallet.GetUTXOsForAmount(
-		context.Background(), txProvider, address, outputsSum+potentialFee, cardanowallet.MinUTxODefaultValue)
+		context.Background(), txProvider, address,
+		outputsSum+potentialFee+cardanowallet.MinUTxODefaultValue,
+		outputsSum+potentialFee+cardanowallet.MinUTxODefaultValue)
 	if err != nil {
 		return nil, "", err
 	}
@@ -211,14 +213,14 @@ func createMultiSigTx(
 
 	multiSigInputs, err := cardanowallet.GetUTXOsForAmount(
 		context.Background(), txProvider, multiSigAddr.String(),
-		outputsSum, cardanowallet.MinUTxODefaultValue)
+		outputsSum, outputsSum+cardanowallet.MinUTxODefaultValue)
 	if err != nil {
 		return nil, "", err
 	}
 
 	multiSigFeeInputs, err := cardanowallet.GetUTXOsForAmount(
 		context.Background(), txProvider, multiSigFeeAddr.String(),
-		potentialFee, cardanowallet.MinUTxODefaultValue)
+		potentialFee, potentialFee+cardanowallet.MinUTxODefaultValue)
 	if err != nil {
 		return nil, "", err
 	}
