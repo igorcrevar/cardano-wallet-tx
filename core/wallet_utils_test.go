@@ -96,10 +96,22 @@ func TestKeyHash(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, keyHashCli, keyHash)
+
+		keyFromFile, err := NewKey(verificationKeyFile)
+		require.NoError(t, err)
+
+		assert.Equal(t, keyFromFile, key)
+
+		keyBytes, err := key.GetKeyBytes()
+		require.NoError(t, err)
+
+		assert.Equal(t, wallet.GetVerificationKey(), keyBytes)
 	}
 }
 
 func TestWalletExtended(t *testing.T) {
+	t.Parallel()
+
 	type walletContainer struct {
 		Wallet      *Wallet `json:"wallet"`
 		WalletStake *Wallet `json:"walletStake"`
@@ -134,10 +146,11 @@ func TestWalletExtended(t *testing.T) {
 	signature, err := SignMessage(wc.Wallet.SigningKey, wc.Wallet.VerificationKey, []byte(msg1))
 	require.NoError(t, err)
 
-	signature2, err := SignMessage(wc.WalletStake.StakeSigningKey, wc.WalletStake.StakeVerificationKey, []byte(msg2))
+	signature2, err := SignMessage(wc.WalletStake.GetStakeSigningKey(),
+		wc.WalletStake.StakeVerificationKey, []byte(msg2))
 	require.NoError(t, err)
 
-	signature3, err := SignMessage(wc.WalletStake.SigningKey, wc.WalletStake.VerificationKey, []byte(msg3))
+	signature3, err := SignMessage(wc.WalletStake.GetSigningKey(), wc.WalletStake.VerificationKey, []byte(msg3))
 	require.NoError(t, err)
 
 	require.NoError(t, VerifyMessage([]byte(msg1), wc.Wallet.VerificationKey, signature))
@@ -149,6 +162,8 @@ func TestWalletExtended(t *testing.T) {
 }
 
 func TestCreateTxWitness(t *testing.T) {
+	t.Parallel()
+
 	wallet, err := GenerateWallet(true)
 	require.NoError(t, err)
 
@@ -159,7 +174,23 @@ func TestCreateTxWitness(t *testing.T) {
 }
 
 func TestGetKeyBytes(t *testing.T) {
+	t.Parallel()
+
 	key, err := GetKeyBytes("58201825bce09711e1563fc1702587da6892d1d869894386323bd4378ea5e3d6cba0")
+	require.NoError(t, err)
+
+	require.Equal(t, []byte{
+		0x18, 0x25, 0xbc, 0xe0, 0x97, 0x11, 0xe1, 0x56, 0x3f, 0xc1, 0x70, 0x25, 0x87, 0xda, 0x68, 0x92, 0xd1, 0xd8, 0x69, 0x89, 0x43, 0x86, 0x32, 0x3b, 0xd4, 0x37, 0x8e, 0xa5, 0xe3, 0xd6, 0xcb, 0xa0,
+	}, key)
+
+	key, err = GetKeyBytes("581Ebce09711e1563fc1702587da6892d1d869894386323bd4378ea5e3d6cba0")
+	require.NoError(t, err)
+
+	require.Equal(t, []byte{
+		0x0, 0x0, 0xbc, 0xe0, 0x97, 0x11, 0xe1, 0x56, 0x3f, 0xc1, 0x70, 0x25, 0x87, 0xda, 0x68, 0x92, 0xd1, 0xd8, 0x69, 0x89, 0x43, 0x86, 0x32, 0x3b, 0xd4, 0x37, 0x8e, 0xa5, 0xe3, 0xd6, 0xcb, 0xa0,
+	}, key)
+
+	key, err = GetKeyBytes("58221825bce09711e1563fc1702587da6892d1d869894386323bd4378ea5e3d6cba0FFFF")
 	require.NoError(t, err)
 
 	require.Equal(t, []byte{

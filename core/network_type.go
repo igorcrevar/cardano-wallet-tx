@@ -8,15 +8,23 @@ const (
 	TestNetProtocolMagic = uint(1097911063)
 	MainNetProtocolMagic = uint(764824073)
 
-	MainNetNetwork CardanoNetworkType = 1
-	TestNetNetwork CardanoNetworkType = 0
+	PrimeTestNetProtocolMagic  = uint(3311)
+	PrimeMainNetProtocolMagic  = uint(764824073)
+	VectorTestNetProtocolMagic = uint(1127)
+	VectorMainNetProtocolMagic = uint(3327)
 
-	KeyHashSize = 28
-	KeySize     = 32
+	VectorMainNetNetwork CardanoNetworkType = 3
+	VectorTestNetNetwork CardanoNetworkType = 2
+	MainNetNetwork       CardanoNetworkType = 1
+	TestNetNetwork       CardanoNetworkType = 0
 )
 
 func (n CardanoNetworkType) GetPrefix() string {
 	switch n {
+	case VectorTestNetNetwork:
+		return "vector_test"
+	case VectorMainNetNetwork:
+		return "vector"
 	case MainNetNetwork:
 		return "addr"
 	case TestNetNetwork:
@@ -28,9 +36,9 @@ func (n CardanoNetworkType) GetPrefix() string {
 
 func (n CardanoNetworkType) GetStakePrefix() string {
 	switch n {
-	case MainNetNetwork:
+	case MainNetNetwork, VectorMainNetNetwork:
 		return "stake"
-	case TestNetNetwork:
+	case TestNetNetwork, VectorTestNetNetwork:
 		return "stake_test"
 	default:
 		return "" // not handled but dont raise an error
@@ -43,5 +51,6 @@ func (n CardanoNetworkType) IsMainNet() bool {
 
 func IsAddressWithValidPrefix(addr string) bool {
 	return strings.HasPrefix(addr, "addr") ||
+		strings.HasPrefix(addr, "vector") ||
 		strings.HasPrefix(addr, "stake")
 }

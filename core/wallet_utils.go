@@ -55,7 +55,7 @@ func SignMessage(signingKey, verificationKey, message []byte) (result []byte, er
 	privateKey := make([]byte, len(signingKey)+len(verificationKey))
 
 	copy(privateKey, signingKey)
-	copy(privateKey[KeySize:], verificationKey)
+	copy(privateKey[len(signingKey):], verificationKey)
 
 	result = ed25519.Sign(privateKey, message)
 
@@ -151,5 +151,5 @@ func GetKeyBytes(key string) ([]byte, error) {
 		return nil, err
 	}
 
-	return result, nil
+	return PadKeyToSize(result), nil
 }

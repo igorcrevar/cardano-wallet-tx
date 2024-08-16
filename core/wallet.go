@@ -9,6 +9,9 @@ import (
 )
 
 const (
+	KeyHashSize = 28
+	KeySize     = 32
+
 	StakeSigningKeyShelley          = "StakeSigningKeyShelley_ed25519"
 	StakeSigningKeyShelleyDesc      = "Stake Signing Key"
 	StakeVerificationKeyShelley     = "StakeVerificationKeyShelley_ed25519"
@@ -29,18 +32,18 @@ type Wallet struct {
 
 func NewWallet(verificationKey []byte, signingKey []byte) *Wallet {
 	return &Wallet{
-		VerificationKey: verificationKey,
-		SigningKey:      signingKey,
+		VerificationKey: PadKeyToSize(verificationKey),
+		SigningKey:      PadKeyToSize(signingKey),
 	}
 }
 
 func NewStakeWallet(verificationKey []byte, signingKey []byte,
 	stakeVerificationKey []byte, stakeSigningKey []byte) *Wallet {
 	return &Wallet{
-		StakeVerificationKey: stakeVerificationKey,
-		StakeSigningKey:      stakeSigningKey,
-		VerificationKey:      verificationKey,
-		SigningKey:           signingKey,
+		StakeVerificationKey: PadKeyToSize(stakeVerificationKey),
+		StakeSigningKey:      PadKeyToSize(stakeSigningKey),
+		VerificationKey:      PadKeyToSize(verificationKey),
+		SigningKey:           PadKeyToSize(signingKey),
 	}
 }
 
@@ -82,7 +85,7 @@ func NewKey(filePath string) (Key, error) {
 }
 
 func NewKeyFromBytes(keyType string, desc string, bytes []byte) (Key, error) {
-	cborBytes, err := cbor.Marshal(bytes)
+	cborBytes, err := cbor.Marshal(PadKeyToSize(bytes))
 	if err != nil {
 		return Key{}, err
 	}
@@ -109,4 +112,19 @@ func (k Key) WriteToFile(filePath string) error {
 	}
 
 	return nil
+}
+
+func PadKeyToSize(key []byte) []byte {
+	// If the key is already 32 bytes long, return it as is
+	if len(key) == KeySize {
+		return key
+	}
+
+	// If the key is shorter than 32 bytes, pad with leading zeroes
+	if len(key) < KeySize {
+		return append(make([]byte, KeySize-len(key)), key...)
+	}
+
+	// If the key is longer than 32 bytes, truncate it to 32 bytes
+	return key[:KeySize]
 }
