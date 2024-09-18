@@ -35,7 +35,6 @@ func NewTxProviderCli(testNetMagic uint, socketPath string, cardanoCliBinary str
 
 func (b *TxProviderCli) Dispose() {
 	os.RemoveAll(b.baseDirectory)
-	os.Remove(b.baseDirectory)
 }
 
 func (b *TxProviderCli) GetProtocolParameters(_ context.Context) ([]byte, error) {

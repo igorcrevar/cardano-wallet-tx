@@ -64,7 +64,6 @@ func NewTxBuilder(cardanoCliBinary string) (*TxBuilder, error) {
 
 func (b *TxBuilder) Dispose() {
 	os.RemoveAll(b.baseDirectory)
-	os.Remove(b.baseDirectory)
 }
 
 func (b *TxBuilder) SetTestNetMagic(testNetMagic uint) *TxBuilder {

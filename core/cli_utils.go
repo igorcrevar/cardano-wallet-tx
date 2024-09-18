@@ -39,10 +39,7 @@ func (cu CliUtils) GetPolicyScriptAddress(
 		return "", err
 	}
 
-	defer func() {
-		os.RemoveAll(baseDirectory)
-		os.Remove(baseDirectory)
-	}()
+	defer os.RemoveAll(baseDirectory)
 
 	policyScriptBytes, err := json.Marshal(policyScript)
 	if err != nil {
@@ -88,10 +85,7 @@ func (cu CliUtils) GetPolicyID(policyScript any) (string, error) {
 		return "", err
 	}
 
-	defer func() {
-		os.RemoveAll(baseDirectory)
-		os.Remove(baseDirectory)
-	}()
+	defer os.RemoveAll(baseDirectory)
 
 	policyScriptBytes, err := json.Marshal(policyScript)
 	if err != nil {
@@ -138,10 +132,7 @@ func (cu CliUtils) GetWalletAddress(wallet IWallet, testNetMagic uint) (addr str
 		return "", "", err
 	}
 
-	defer func() {
-		os.RemoveAll(baseDirectory)
-		os.Remove(baseDirectory)
-	}()
+	defer os.RemoveAll(baseDirectory)
 
 	key, err := NewKeyFromBytes(
 		PaymentVerificationKeyShelley, PaymentVerificationKeyShelleyDesc, wallet.GetVerificationKey())
@@ -212,10 +203,7 @@ func (cu CliUtils) GetTxHash(txRaw []byte) (string, error) {
 		return "", err
 	}
 
-	defer func() {
-		os.RemoveAll(baseDirectory)
-		os.Remove(baseDirectory)
-	}()
+	defer os.RemoveAll(baseDirectory)
 
 	return cu.getTxHash(txRaw, baseDirectory)
 }

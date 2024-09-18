@@ -68,10 +68,7 @@ func TestKeyHash(t *testing.T) {
 	baseDirectory, err := os.MkdirTemp("", "key-hash-test")
 	require.NoError(t, err)
 
-	defer func() {
-		os.RemoveAll(baseDirectory)
-		os.Remove(baseDirectory)
-	}()
+	defer os.RemoveAll(baseDirectory)
 
 	const accountsNumber = 20
 
