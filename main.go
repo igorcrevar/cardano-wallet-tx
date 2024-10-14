@@ -15,10 +15,10 @@ const (
 	testNetMagic            = uint(2)
 	ogmiosUrl               = "http://localhost:1337"
 	blockfrostUrl           = "https://cardano-preview.blockfrost.io/api/v0"
-	blockfrostProjectApiKey = ""
+	blockfrostProjectApiKey = "preview7mGSjpyEKb24OxQ4cCxomxZ5axMs5PvE"
 	potentialFee            = uint64(300_000)
 	providerName            = "blockfrost"
-	receiverAddr            = "addr_test1wz4k6frsfd9q98rya6zjxtpcmzn83pwc8uyl9yqw25p8qqcx3e0c0"
+	receiverAddr            = "addr_test1wp0ddags4htgr23m7wt30uuxkyjjnm9u4rr5m84rzl7zw7q66x2wz"
 	receiverMultisigAddr    = "addr_test1vrhltc3r25sha3khwrpkdqqscfmplgyx8tap96tvl79zypgr4mc9f"
 )
 
@@ -135,7 +135,20 @@ func createMultiSigTx(
 	testNetMagic uint, potentialFee uint64, receiverAddr string,
 ) ([]byte, string, error) {
 	policyScriptMultiSig := cardanowallet.NewPolicyScript(getKeyHashes(signers), len(signers)*2/3+1)
-	policyScriptFeeMultiSig := cardanowallet.NewPolicyScript(getKeyHashes(feeSigners), len(signers)*2/3+1)
+
+	hashFirst, _ := cardanowallet.GetKeyHash(signers[1].GetVerificationKey())
+	policyScriptMultiSig = &cardanowallet.PolicyScript{
+		Type: "any",
+		Scripts: []cardanowallet.PolicyScript{
+			{
+				Type:    "sig",
+				KeyHash: hashFirst,
+			},
+			*policyScriptMultiSig,
+		},
+	}
+
+	policyScriptFeeMultiSig := cardanowallet.NewPolicyScript(getKeyHashes(feeSigners), len(feeSigners)*2/3+1)
 	cliUtils := cardanowallet.NewCliUtils(cardanoCliBinary)
 
 	multisigPolicyID, err := cliUtils.GetPolicyID(policyScriptMultiSig)
@@ -257,6 +270,8 @@ func createMultiSigTx(
 	if err != nil {
 		return nil, "", err
 	}
+
+	signers = signers[1:2] //uncomment for admin
 
 	witnesses := make([][]byte, len(signers)+len(feeSigners))
 	for i, w := range signers {
