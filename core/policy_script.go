@@ -46,12 +46,19 @@ func (ps PolicyScript) GetPolicyScriptJSON() ([]byte, error) {
 	return json.MarshalIndent(ps, "", "  ")
 }
 
-func (ps PolicyScript) GetCount() int {
-	cnt := 0
-
-	for _, x := range ps.Scripts {
-		if x.Type == PolicyScriptSigType {
-			cnt++
+func (ps PolicyScript) GetCount() (cnt int) {
+	switch ps.Type {
+	case PolicyScriptSigType:
+		cnt = 1
+	case "any":
+		for _, x := range ps.Scripts {
+			if subCnt := x.GetCount(); cnt < subCnt {
+				cnt = subCnt
+			}
+		}
+	case "all", PolicyScriptAtLeastType:
+		for _, x := range ps.Scripts {
+			cnt += x.GetCount()
 		}
 	}
 

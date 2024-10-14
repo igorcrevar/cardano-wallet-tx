@@ -198,7 +198,6 @@ func (b *TxBuilder) CalculateFee(witnessCount int) (uint64, error) {
 		"--tx-in-count", strconv.Itoa(len(b.inputs)),
 		"--tx-out-count", strconv.Itoa(len(b.outputs)),
 		"--witness-count", strconv.FormatUint(uint64(witnessCount), 10),
-		"--byron-witness-count", "0",
 		"--protocol-params-file", protocolParamsFilePath,
 	}, getTestNetMagicArgs(b.testNetMagic)...))
 	if err != nil {
