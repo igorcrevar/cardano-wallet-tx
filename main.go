@@ -18,6 +18,8 @@ const (
 	blockfrostProjectApiKey = ""
 	potentialFee            = uint64(300_000)
 	providerName            = "blockfrost"
+	receiverAddr            = "addr_test1wz4k6frsfd9q98rya6zjxtpcmzn83pwc8uyl9yqw25p8qqcx3e0c0"
+	receiverMultisigAddr    = "addr_test1vrhltc3r25sha3khwrpkdqqscfmplgyx8tap96tvl79zypgr4mc9f"
 )
 
 func getSplitedStr(s string, mxlen int) (res []string) {
@@ -226,13 +228,17 @@ func createMultiSigTx(
 	}
 
 	builder.SetMetaData(metadataBytes).SetTestNetMagic(testNetMagic)
-	builder.AddOutputs(outputs...).AddOutputs(cardanowallet.TxOutput{
-		Addr: multiSigAddr.String(),
-	}).AddOutputs(cardanowallet.TxOutput{
-		Addr: multiSigFeeAddr.String(),
-	})
+	builder.AddOutputs(outputs...)
 	builder.AddInputsWithScript(policyScriptMultiSig, multiSigInputs.Inputs...)
 	builder.AddInputsWithScript(policyScriptFeeMultiSig, multiSigFeeInputs.Inputs...)
+
+	if change := multiSigInputs.Sum - outputsSum; change > 0 {
+		builder.AddOutputs(cardanowallet.TxOutput{
+			Addr: multiSigAddr.String(), Amount: change,
+		})
+	}
+
+	builder.AddOutputs(cardanowallet.TxOutput{Addr: multiSigFeeAddr.String()})
 
 	fee, err := builder.CalculateFee(0)
 	if err != nil {
@@ -241,8 +247,11 @@ func createMultiSigTx(
 
 	builder.SetFee(fee)
 
-	builder.UpdateOutputAmount(-2, multiSigInputs.Sum-outputsSum)
-	builder.UpdateOutputAmount(-1, multiSigFeeInputs.Sum-fee)
+	if change := multiSigFeeInputs.Sum - fee; change > 0 {
+		builder.UpdateOutputAmount(-1, change)
+	} else {
+		builder.RemoveOutput(-1)
+	}
 
 	txRaw, txHash, err := builder.Build()
 	if err != nil {
@@ -374,15 +383,6 @@ func main() {
 
 	_, _ = txProvider.GetTip(context.Background())
 
-	receiverBaseAddr, err := cardanowallet.NewBaseAddress(
-		cardanowallet.TestNetNetwork, wallets[1].GetVerificationKey(), wallets[1].GetStakeVerificationKey())
-	if err != nil {
-		fmt.Printf("error: %v\n", err)
-		os.Exit(1)
-	}
-
-	receiverAddr := receiverBaseAddr.String()
-
 	sigTx, txHash, err := createTx(
 		cardanoCliBinary, txProvider, wallets[0], testNetMagic, potentialFee, receiverAddr)
 	if err != nil {
@@ -396,13 +396,13 @@ func main() {
 	}
 
 	multiSigTx, multiSigTxHash, err := createMultiSigTx(
-		cardanoCliBinary, txProvider, wallets[:3], wallets[3:], testNetMagic, potentialFee, receiverAddr)
+		cardanoCliBinary, txProvider, wallets[:3], wallets[3:], testNetMagic, potentialFee, receiverMultisigAddr)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
 
-	if err := submitTx(context.Background(), txProvider, multiSigTx, multiSigTxHash, receiverAddr); err != nil {
+	if err := submitTx(context.Background(), txProvider, multiSigTx, multiSigTxHash, receiverMultisigAddr); err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
