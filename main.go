@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"time"
 
+	"github.com/igorcrevar/cardano-wallet-tx/common"
 	cardanowallet "github.com/igorcrevar/cardano-wallet-tx/core"
 )
 
@@ -352,14 +352,25 @@ func submitTx(
 
 	fmt.Println("transaction has been submitted. hash =", txHash)
 
-	err = cardanowallet.WaitForAmount(ctx, txProvider, addr, func(val uint64) bool {
-		return val >= expectedAtLeast
-	}, 60, time.Second*5)
+	newBalance, err := common.ExecuteWithRetry(ctx, func(ctx context.Context) (uint64, error) {
+		utxos, err := txProvider.GetUtxos(ctx, addr)
+		if err != nil {
+			return 0, err
+		}
+
+		sum := cardanowallet.GetUtxosSum(utxos)
+
+		if sum < expectedAtLeast {
+			return 0, common.ErrRetryTryAgain
+		}
+
+		return sum, nil
+	}, common.WithRetryCount(60))
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("transaction has been included in block. hash =", txHash)
+	fmt.Printf("transaction has been included in block. hash = %s, balance = %d\n", txHash, newBalance)
 
 	return nil
 }
