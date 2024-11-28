@@ -1,9 +1,20 @@
-# cardano-wallet-tx
-A Go wrapper around the Cardano CLI that offers the following features:
-- Create simple wallets (signing/verifying keys) and addresses
-- Create multisig addresses via policy script
-- Create transactions
-- Transaction hash signing and assembling signatures into the final transaction
-- Query UTXOs, slot, protocol parameters, and submit transactions with Ogmios, Blockfrost or CLI
+# go-cardano-tx
 
-Note: It only supports simple money transfer transactions (including tokens/native assets); there is no functionality for smart contracts, etc.
+A comprehensive library for creating, signing, and submitting Cardano transactions with a focus on ease of use and flexibility. The library offers the following key functionalities:
+
+- **Transaction Creation**:  
+   - Build transactions using the Cardano CLI.  
+   - Supports **lovelace** and **native assets/tokens**.  
+   - *(Note: Smart contracts and advanced functionalities are currently not supported.)*
+
+- **Transaction Signing**:  
+   - Sign transactions and assemble multiple signatures into a finalized transaction.
+
+- **Blockchain Queries**:  
+   - Query UTXOs, current slot, protocol parameters, and submit transactions using **Ogmios**, **Blockfrost**, or the Cardano CLI.
+
+- **Address Management**:  
+   - Generate and manipulate Cardano addresses.  
+
+- **Multisig Support**:  
+   - Create multisig addresses using policy scripts.

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/igorcrevar/cardano-wallet-tx/common"
-	cardanowallet "github.com/igorcrevar/cardano-wallet-tx/core"
+	"github.com/igorcrevar/go-cardano-tx/common"
+	cardano "github.com/igorcrevar/go-cardano-tx/core"
 )
 
 const (
@@ -36,10 +36,10 @@ func getSplitedStr(s string, mxlen int) (res []string) {
 	return res
 }
 
-func getKeyHashes(wallets []*cardanowallet.Wallet) []string {
+func getKeyHashes(wallets []*cardano.Wallet) []string {
 	keyHashes := make([]string, len(wallets))
 	for i, w := range wallets {
-		keyHashes[i], _ = cardanowallet.GetKeyHash(w.VerificationKey)
+		keyHashes[i], _ = cardano.GetKeyHash(w.VerificationKey)
 	}
 
 	return keyHashes
@@ -47,15 +47,15 @@ func getKeyHashes(wallets []*cardanowallet.Wallet) []string {
 
 func createTx(
 	cardanoCliBinary string,
-	txProvider cardanowallet.ITxProvider,
-	wallet *cardanowallet.Wallet,
+	txProvider cardano.ITxProvider,
+	wallet *cardano.Wallet,
 	testNetMagic uint,
 	receiverAddr string,
 	lovelaceSendAmount uint64,
 	potentialFee uint64,
 ) ([]byte, string, error) {
-	enterptiseAddress, err := cardanowallet.NewEnterpriseAddress(
-		cardanowallet.TestNetNetwork, wallet.VerificationKey)
+	enterptiseAddress, err := cardano.NewEnterpriseAddress(
+		cardano.TestNetNetwork, wallet.VerificationKey)
 	if err != nil {
 		return nil, "", err
 	}
@@ -67,7 +67,7 @@ func createTx(
 		},
 	}
 
-	builder, err := cardanowallet.NewTxBuilder(cardanoCliBinary)
+	builder, err := cardano.NewTxBuilder(cardanoCliBinary)
 	if err != nil {
 		return nil, "", err
 	}
@@ -83,24 +83,24 @@ func createTx(
 		return nil, "", err
 	}
 
-	inputs, err := cardanowallet.GetUTXOsForAmount(
+	inputs, err := cardano.GetUTXOsForAmount(
 		context.Background(),
 		txProvider,
 		senderAddress,
-		[]string{cardanowallet.AdaTokenName},
-		map[string]uint64{cardanowallet.AdaTokenName: lovelaceSendAmount + potentialFee + minUtxoValue},
-		map[string]uint64{cardanowallet.AdaTokenName: lovelaceSendAmount + potentialFee + minUtxoValue})
+		[]string{cardano.AdaTokenName},
+		map[string]uint64{cardano.AdaTokenName: lovelaceSendAmount + potentialFee + minUtxoValue},
+		map[string]uint64{cardano.AdaTokenName: lovelaceSendAmount + potentialFee + minUtxoValue})
 	if err != nil {
 		return nil, "", err
 	}
 
-	tokens, err := cardanowallet.GetTokensFromSumMap(inputs.Sum)
+	tokens, err := cardano.GetTokensFromSumMap(inputs.Sum)
 	if err != nil {
 		return nil, "", err
 	}
 
-	lovelaceInputsSum := inputs.Sum[cardanowallet.AdaTokenName]
-	outputs := []cardanowallet.TxOutput{
+	lovelaceInputsSum := inputs.Sum[cardano.AdaTokenName]
+	outputs := []cardano.TxOutput{
 		{
 			Addr:   receiverAddr,
 			Amount: lovelaceSendAmount,
@@ -138,17 +138,17 @@ func createTx(
 
 func createMultiSigTx(
 	cardanoCliBinary string,
-	txProvider cardanowallet.ITxProvider,
-	signers []*cardanowallet.Wallet,
-	feeSigners []*cardanowallet.Wallet,
+	txProvider cardano.ITxProvider,
+	signers []*cardano.Wallet,
+	feeSigners []*cardano.Wallet,
 	testNetMagic uint,
 	receiverAddr string,
 	lovelaceSendAmount uint64,
 	potentialFee uint64,
 ) ([]byte, string, error) {
-	policyScriptMultiSig := cardanowallet.NewPolicyScript(getKeyHashes(signers), len(signers)*2/3+1)
-	policyScriptFeeMultiSig := cardanowallet.NewPolicyScript(getKeyHashes(feeSigners), len(signers)*2/3+1)
-	cliUtils := cardanowallet.NewCliUtils(cardanoCliBinary)
+	policyScriptMultiSig := cardano.NewPolicyScript(getKeyHashes(signers), len(signers)*2/3+1)
+	policyScriptFeeMultiSig := cardano.NewPolicyScript(getKeyHashes(feeSigners), len(signers)*2/3+1)
+	cliUtils := cardano.NewCliUtils(cardanoCliBinary)
 
 	multisigPolicyID, err := cliUtils.GetPolicyID(policyScriptMultiSig)
 	if err != nil {
@@ -160,12 +160,12 @@ func createMultiSigTx(
 		return nil, "", err
 	}
 
-	multiSigAddr, err := cardanowallet.NewPolicyScriptAddress(cardanowallet.TestNetNetwork, multisigPolicyID)
+	multiSigAddr, err := cardano.NewPolicyScriptAddress(cardano.TestNetNetwork, multisigPolicyID)
 	if err != nil {
 		return nil, "", err
 	}
 
-	multiSigFeeAddr, err := cardanowallet.NewPolicyScriptAddress(cardanowallet.TestNetNetwork, feeMultisigPolicyID)
+	multiSigFeeAddr, err := cardano.NewPolicyScriptAddress(cardano.TestNetNetwork, feeMultisigPolicyID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -200,7 +200,7 @@ func createMultiSigTx(
 		},
 	}
 
-	builder, err := cardanowallet.NewTxBuilder(cardanoCliBinary)
+	builder, err := cardano.NewTxBuilder(cardanoCliBinary)
 	if err != nil {
 		return nil, "", err
 	}
@@ -216,41 +216,41 @@ func createMultiSigTx(
 		return nil, "", err
 	}
 
-	multiSigInputs, err := cardanowallet.GetUTXOsForAmount(
+	multiSigInputs, err := cardano.GetUTXOsForAmount(
 		context.Background(),
 		txProvider,
 		multiSigAddr.String(),
-		[]string{cardanowallet.AdaTokenName},
-		map[string]uint64{cardanowallet.AdaTokenName: lovelaceSendAmount + minUtxoValue},
-		map[string]uint64{cardanowallet.AdaTokenName: lovelaceSendAmount + minUtxoValue})
+		[]string{cardano.AdaTokenName},
+		map[string]uint64{cardano.AdaTokenName: lovelaceSendAmount + minUtxoValue},
+		map[string]uint64{cardano.AdaTokenName: lovelaceSendAmount + minUtxoValue})
 	if err != nil {
 		return nil, "", err
 	}
 
-	multiSigFeeInputs, err := cardanowallet.GetUTXOsForAmount(
+	multiSigFeeInputs, err := cardano.GetUTXOsForAmount(
 		context.Background(),
 		txProvider,
 		multiSigFeeAddr.String(),
-		[]string{cardanowallet.AdaTokenName},
-		map[string]uint64{cardanowallet.AdaTokenName: potentialFee},
-		map[string]uint64{cardanowallet.AdaTokenName: potentialFee + minUtxoValue})
+		[]string{cardano.AdaTokenName},
+		map[string]uint64{cardano.AdaTokenName: potentialFee},
+		map[string]uint64{cardano.AdaTokenName: potentialFee + minUtxoValue})
 	if err != nil {
 		return nil, "", err
 	}
 
-	tokens, err := cardanowallet.GetTokensFromSumMap(multiSigInputs.Sum)
+	tokens, err := cardano.GetTokensFromSumMap(multiSigInputs.Sum)
 	if err != nil {
 		return nil, "", err
 	}
 
-	tokensFee, err := cardanowallet.GetTokensFromSumMap(multiSigFeeInputs.Sum)
+	tokensFee, err := cardano.GetTokensFromSumMap(multiSigFeeInputs.Sum)
 	if err != nil {
 		return nil, "", err
 	}
 
-	lovelaceInputsSum := multiSigInputs.Sum[cardanowallet.AdaTokenName]
-	lovelaceInputsFeeSum := multiSigFeeInputs.Sum[cardanowallet.AdaTokenName]
-	outputs := []cardanowallet.TxOutput{
+	lovelaceInputsSum := multiSigInputs.Sum[cardano.AdaTokenName]
+	lovelaceInputsFeeSum := multiSigFeeInputs.Sum[cardano.AdaTokenName]
+	outputs := []cardano.TxOutput{
 		{
 			Addr:   receiverAddr,
 			Amount: lovelaceSendAmount,
@@ -293,7 +293,7 @@ func createMultiSigTx(
 		return nil, "", err
 	}
 
-	allTxSigners := make([]cardanowallet.ITxSigner, len(feeSigners)+len(signers))
+	allTxSigners := make([]cardano.ITxSigner, len(feeSigners)+len(signers))
 	for i, w := range signers {
 		allTxSigners[i] = w
 	}
@@ -310,18 +310,18 @@ func createMultiSigTx(
 	return txSignedRaw, txHash, nil
 }
 
-func createProvider(name string, cardanoCliBinary string) (cardanowallet.ITxProvider, error) {
+func createProvider(name string, cardanoCliBinary string) (cardano.ITxProvider, error) {
 	switch name {
 	case "blockfrost":
-		return cardanowallet.NewTxProviderBlockFrost(blockfrostUrl, blockfrostProjectApiKey), nil
+		return cardano.NewTxProviderBlockFrost(blockfrostUrl, blockfrostProjectApiKey), nil
 	case "ogmios":
-		return cardanowallet.NewTxProviderOgmios(ogmiosUrl), nil
+		return cardano.NewTxProviderOgmios(ogmiosUrl), nil
 	default:
-		return cardanowallet.NewTxProviderCli(testNetMagic, socketPath, cardanoCliBinary)
+		return cardano.NewTxProviderCli(testNetMagic, socketPath, cardanoCliBinary)
 	}
 }
 
-func loadWallets() ([]*cardanowallet.Wallet, error) {
+func loadWallets() ([]*cardano.Wallet, error) {
 	verificationKeys := []string{
 		"582068fc463c29900b00122423c7e6a39469987786314e07a5e7f5eae76a5fe671bf",
 		"58209a9cefaa636d75dffa3a3a5ab446a191beac92b09ac82da513640e8e35935202",
@@ -339,19 +339,19 @@ func loadWallets() ([]*cardanowallet.Wallet, error) {
 		"582058fb35da120c65855ad691dadf5681a2e4fc62e9dcda0d0774ff6fdc463a679a",
 	}
 
-	wallets := make([]*cardanowallet.Wallet, len(verificationKeys))
+	wallets := make([]*cardano.Wallet, len(verificationKeys))
 	for i := range verificationKeys {
-		signingKey, err := cardanowallet.GetKeyBytes(signingKeys[i])
+		signingKey, err := cardano.GetKeyBytes(signingKeys[i])
 		if err != nil {
 			return nil, err
 		}
 
-		verificationKey, err := cardanowallet.GetKeyBytes(verificationKeys[i])
+		verificationKey, err := cardano.GetKeyBytes(verificationKeys[i])
 		if err != nil {
 			return nil, err
 		}
 
-		wallets[i] = cardanowallet.NewWallet(verificationKey, signingKey)
+		wallets[i] = cardano.NewWallet(verificationKey, signingKey)
 	}
 
 	return wallets, nil
@@ -359,7 +359,7 @@ func loadWallets() ([]*cardanowallet.Wallet, error) {
 
 func submitTx(
 	ctx context.Context,
-	txProvider cardanowallet.ITxProvider,
+	txProvider cardano.ITxProvider,
 	txRaw []byte,
 	txHash string,
 	addr string,
@@ -375,7 +375,7 @@ func submitTx(
 		return err
 	}
 
-	expectedAtLeast := cardanowallet.GetUtxosSum(utxos)[tokenName] + amountIncrement
+	expectedAtLeast := cardano.GetUtxosSum(utxos)[tokenName] + amountIncrement
 
 	fmt.Println("transaction has been submitted. hash =", txHash)
 
@@ -385,7 +385,7 @@ func submitTx(
 			return 0, err
 		}
 
-		sum := cardanowallet.GetUtxosSum(utxos)
+		sum := cardano.GetUtxosSum(utxos)
 
 		if sum[tokenName] < expectedAtLeast {
 			return 0, common.ErrRetryTryAgain
@@ -403,7 +403,7 @@ func submitTx(
 }
 
 func main() {
-	cardanoCliBinary := cardanowallet.ResolveCardanoCliBinary(cardanowallet.TestNetNetwork)
+	cardanoCliBinary := cardano.ResolveCardanoCliBinary(cardano.TestNetNetwork)
 
 	wallets, err := loadWallets()
 	if err != nil {
@@ -440,7 +440,7 @@ func main() {
 		txRaw,
 		txHash,
 		receiverAddr,
-		cardanowallet.AdaTokenName,
+		cardano.AdaTokenName,
 		minUtxoValue)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
@@ -467,7 +467,7 @@ func main() {
 		txRawMultisig,
 		txHashMultisig,
 		receiverMultisigAddr,
-		cardanowallet.AdaTokenName,
+		cardano.AdaTokenName,
 		minUtxoValue)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)

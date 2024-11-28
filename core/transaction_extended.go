@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/igorcrevar/cardano-wallet-tx/common"
+	"github.com/igorcrevar/go-cardano-tx/common"
 )
 
 const defaultTimeToLiveInc = 200

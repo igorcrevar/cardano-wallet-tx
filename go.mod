@@ -1,4 +1,4 @@
-module github.com/igorcrevar/cardano-wallet-tx
+module github.com/igorcrevar/go-cardano-tx
 
 go 1.21
 

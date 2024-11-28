@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/igorcrevar/cardano-wallet-tx/core/bech32"
+	"github.com/igorcrevar/go-cardano-tx/core/bech32"
 )
 
 // code mainly from https://github.com/fivebinaries/go-cardano-serialization/blob/master/address/address.go
