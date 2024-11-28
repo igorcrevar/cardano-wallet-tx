@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -67,34 +68,57 @@ func (b *TxProviderCli) GetUtxos(_ context.Context, addr string) ([]Utxo, error)
 	inputs := make([]Utxo, len(rows))
 
 	for i, x := range rows {
-		cnt := 0
+		j, cnt, parts := 0, 0, strings.Split(x, " ")
 
-	exitloop:
-		for _, val := range strings.Split(x, " ") {
-			if val == "" {
+		for j < len(parts) {
+			partStr := parts[j]
+			j++
+
+			if partStr == "" {
 				continue
 			}
 
 			cnt++
 			switch cnt {
 			case 1:
-				inputs[i].Hash = val
+				inputs[i].Hash = partStr
 			case 2:
-				intVal, err := strconv.ParseUint(val, 10, 64)
+				outputIndex, err := strconv.ParseUint(partStr, 0, 64)
 				if err != nil {
 					return nil, err
 				}
 
-				inputs[i].Index = uint32(intVal)
-			case 3:
-				intVal, err := strconv.ParseUint(val, 10, 64)
-				if err != nil {
-					return nil, err
+				inputs[i].Index = uint32(outputIndex) //nolint:gosec
+			default:
+				if partStr == "" || partStr == "+" || strings.Contains(partStr, "Datum") {
+					continue
 				}
 
-				inputs[i].Amount = intVal
+				amount, err := strconv.ParseUint(partStr, 10, 64)
+				if err != nil {
+					continue
+				}
 
-				break exitloop
+				if j < len(parts) {
+					if parts[j] == AdaTokenName {
+						inputs[i].Amount = amount
+
+						j++
+					} else if tokenData := strings.Split(parts[j], "."); len(tokenData) == 2 {
+						realName, err := hex.DecodeString(tokenData[1])
+						if err == nil {
+							tokenData[1] = string(realName)
+						}
+
+						inputs[i].Tokens = append(inputs[i].Tokens, TokenAmount{
+							PolicyID: tokenData[0],
+							Name:     tokenData[1],
+							Amount:   amount,
+						})
+
+						j++
+					}
+				}
 			}
 		}
 	}

@@ -4,22 +4,34 @@ import (
 	"context"
 )
 
-// GetUtxosSum returns sum of all utxos
-func GetUtxosSum(utxos []Utxo) (sum uint64) {
+// GetUtxosSum returns sum for tokens in utxos (including lovelace)
+func GetUtxosSum(utxos []Utxo) map[string]uint64 {
+	result := map[string]uint64{}
+
 	for _, utxo := range utxos {
-		sum += utxo.Amount
+		result[AdaTokenName] += utxo.Amount
+
+		for _, token := range utxo.Tokens {
+			result[token.TokenName()] += token.Amount
+		}
 	}
 
-	return sum
+	return result
 }
 
-// GetOutputsSum returns sum of tx outputs
-func GetOutputsSum(outputs []TxOutput) (receiversSum uint64) {
-	for _, x := range outputs {
-		receiversSum += x.Amount
+// GetOutputsSum returns sum or tokens in outputs (including lovelace)
+func GetOutputsSum(outputs []TxOutput) map[string]uint64 {
+	result := map[string]uint64{}
+
+	for _, output := range outputs {
+		result[AdaTokenName] += output.Amount
+
+		for _, token := range output.Tokens {
+			result[token.TokenName()] += token.Amount
+		}
 	}
 
-	return receiversSum
+	return result
 }
 
 // IsTxInUtxos checks whether a specified transaction hash (txHash)
@@ -37,4 +49,36 @@ func IsTxInUtxos(ctx context.Context, utxoRetriever IUTxORetriever, addr string,
 	}
 
 	return false, nil
+}
+
+// GetTokensFromSumMap processes a map of token names to their quantities and returns a slice of TokenAmount objects
+func GetTokensFromSumMap(sum map[string]uint64, skipTokenNames ...string) (result []TokenAmount, err error) {
+	result = make([]TokenAmount, 0, len(sum)-1)
+
+	for tokenName, amount := range sum {
+		shouldSkip := tokenName == AdaTokenName // lovelace should be skipped always
+
+		if !shouldSkip {
+			for _, name := range skipTokenNames {
+				if name == tokenName {
+					shouldSkip = true
+
+					break
+				}
+			}
+		}
+
+		if shouldSkip {
+			continue
+		}
+
+		token, err := NewTokenAmountWithFullName(tokenName, amount, true)
+		if err != nil {
+			return result, err
+		}
+
+		result = append(result, token)
+	}
+
+	return result, nil
 }

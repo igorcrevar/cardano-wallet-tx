@@ -20,6 +20,7 @@ const (
 	providerName            = "blockfrost"
 	receiverAddr            = "addr_test1wz4k6frsfd9q98rya6zjxtpcmzn83pwc8uyl9yqw25p8qqcx3e0c0"
 	receiverMultisigAddr    = "addr_test1vrhltc3r25sha3khwrpkdqqscfmplgyx8tap96tvl79zypgr4mc9f"
+	minUtxoValue            = uint64(1_000_000)
 )
 
 func getSplitedStr(s string, mxlen int) (res []string) {
@@ -46,8 +47,12 @@ func getKeyHashes(wallets []cardanowallet.IWallet) []string {
 
 func createTx(
 	cardanoCliBinary string,
-	txProvider cardanowallet.ITxProvider, wallet cardanowallet.IWallet,
-	testNetMagic uint, potentialFee uint64, receiverAddr string,
+	txProvider cardanowallet.ITxProvider,
+	wallet cardanowallet.IWallet,
+	testNetMagic uint,
+	receiverAddr string,
+	lovelaceSendAmount uint64,
+	potentialFee uint64,
 ) ([]byte, string, error) {
 	enterptiseAddress, err := cardanowallet.NewEnterpriseAddress(
 		cardanowallet.TestNetNetwork, wallet.GetVerificationKey())
@@ -55,22 +60,12 @@ func createTx(
 		return nil, "", err
 	}
 
-	address := enterptiseAddress.String()
-
-	fmt.Println("address =", address)
-
+	senderAddress := enterptiseAddress.String()
 	metadata := map[string]interface{}{
 		"0": map[string]interface{}{
 			"type": "single",
 		},
 	}
-	outputs := []cardanowallet.TxOutput{
-		{
-			Addr:   receiverAddr,
-			Amount: cardanowallet.MinUTxODefaultValue,
-		},
-	}
-	outputsSum := cardanowallet.GetOutputsSum(outputs)
 
 	builder, err := cardanowallet.NewTxBuilder(cardanoCliBinary)
 	if err != nil {
@@ -89,18 +84,35 @@ func createTx(
 	}
 
 	inputs, err := cardanowallet.GetUTXOsForAmount(
-		context.Background(), txProvider, address,
-		outputsSum+potentialFee+cardanowallet.MinUTxODefaultValue,
-		outputsSum+potentialFee+cardanowallet.MinUTxODefaultValue)
+		context.Background(),
+		txProvider,
+		senderAddress,
+		[]string{cardanowallet.AdaTokenName},
+		map[string]uint64{cardanowallet.AdaTokenName: lovelaceSendAmount + potentialFee + minUtxoValue},
+		map[string]uint64{cardanowallet.AdaTokenName: lovelaceSendAmount + potentialFee + minUtxoValue})
 	if err != nil {
 		return nil, "", err
 	}
 
+	tokens, err := cardanowallet.GetTokensFromSumMap(inputs.Sum)
+	if err != nil {
+		return nil, "", err
+	}
+
+	lovelaceInputsSum := inputs.Sum[cardanowallet.AdaTokenName]
+	outputs := []cardanowallet.TxOutput{
+		{
+			Addr:   receiverAddr,
+			Amount: lovelaceSendAmount,
+		},
+		{
+			Addr:   senderAddress,
+			Tokens: tokens,
+		},
+	}
+
 	builder.SetMetaData(metadataBytes).SetTestNetMagic(testNetMagic)
-	builder.AddOutputs(outputs...).AddOutputs(cardanowallet.TxOutput{
-		Addr: address,
-	})
-	builder.AddInputs(inputs.Inputs...)
+	builder.AddInputs(inputs.Inputs...).AddOutputs(outputs...)
 
 	fee, err := builder.CalculateFee(1)
 	if err != nil {
@@ -109,7 +121,7 @@ func createTx(
 
 	builder.SetFee(fee)
 
-	builder.UpdateOutputAmount(-1, inputs.Sum-outputsSum-fee)
+	builder.UpdateOutputAmount(-1, lovelaceInputsSum-lovelaceSendAmount-fee)
 
 	txRaw, txHash, err := builder.Build()
 	if err != nil {
@@ -130,9 +142,14 @@ func createTx(
 }
 
 func createMultiSigTx(
-	cardanoCliBinary string, txProvider cardanowallet.ITxProvider,
-	signers []cardanowallet.IWallet, feeSigners []cardanowallet.IWallet,
-	testNetMagic uint, potentialFee uint64, receiverAddr string,
+	cardanoCliBinary string,
+	txProvider cardanowallet.ITxProvider,
+	signers []cardanowallet.IWallet,
+	feeSigners []cardanowallet.IWallet,
+	testNetMagic uint,
+	receiverAddr string,
+	lovelaceSendAmount uint64,
+	potentialFee uint64,
 ) ([]byte, string, error) {
 	policyScriptMultiSig := cardanowallet.NewPolicyScript(getKeyHashes(signers), len(signers)*2/3+1)
 	policyScriptFeeMultiSig := cardanowallet.NewPolicyScript(getKeyHashes(feeSigners), len(signers)*2/3+1)
@@ -157,8 +174,6 @@ func createMultiSigTx(
 	if err != nil {
 		return nil, "", err
 	}
-
-	fmt.Println("multi-address sig =", multiSigAddr, " multi-address fee =", multiSigFeeAddr)
 
 	metadata := map[string]interface{}{
 		"0": map[string]interface{}{
@@ -189,13 +204,6 @@ func createMultiSigTx(
 			"type": "bridgingRequest",
 		},
 	}
-	outputs := []cardanowallet.TxOutput{
-		{
-			Addr:   receiverAddr,
-			Amount: cardanowallet.MinUTxODefaultValue,
-		},
-	}
-	outputsSum := cardanowallet.GetOutputsSum(outputs)
 
 	builder, err := cardanowallet.NewTxBuilder(cardanoCliBinary)
 	if err != nil {
@@ -214,31 +222,59 @@ func createMultiSigTx(
 	}
 
 	multiSigInputs, err := cardanowallet.GetUTXOsForAmount(
-		context.Background(), txProvider, multiSigAddr.String(),
-		outputsSum, outputsSum+cardanowallet.MinUTxODefaultValue)
+		context.Background(),
+		txProvider,
+		multiSigAddr.String(),
+		[]string{cardanowallet.AdaTokenName},
+		map[string]uint64{cardanowallet.AdaTokenName: lovelaceSendAmount + minUtxoValue},
+		map[string]uint64{cardanowallet.AdaTokenName: lovelaceSendAmount + minUtxoValue})
 	if err != nil {
 		return nil, "", err
 	}
 
 	multiSigFeeInputs, err := cardanowallet.GetUTXOsForAmount(
-		context.Background(), txProvider, multiSigFeeAddr.String(),
-		potentialFee, potentialFee+cardanowallet.MinUTxODefaultValue)
+		context.Background(),
+		txProvider,
+		multiSigFeeAddr.String(),
+		[]string{cardanowallet.AdaTokenName},
+		map[string]uint64{cardanowallet.AdaTokenName: potentialFee},
+		map[string]uint64{cardanowallet.AdaTokenName: potentialFee + minUtxoValue})
 	if err != nil {
 		return nil, "", err
+	}
+
+	tokens, err := cardanowallet.GetTokensFromSumMap(multiSigInputs.Sum)
+	if err != nil {
+		return nil, "", err
+	}
+
+	tokensFee, err := cardanowallet.GetTokensFromSumMap(multiSigFeeInputs.Sum)
+	if err != nil {
+		return nil, "", err
+	}
+
+	lovelaceInputsSum := multiSigInputs.Sum[cardanowallet.AdaTokenName]
+	lovelaceInputsFeeSum := multiSigFeeInputs.Sum[cardanowallet.AdaTokenName]
+	outputs := []cardanowallet.TxOutput{
+		{
+			Addr:   receiverAddr,
+			Amount: lovelaceSendAmount,
+		},
+		{
+			Addr:   multiSigAddr.String(),
+			Amount: lovelaceInputsSum - lovelaceSendAmount,
+			Tokens: tokens,
+		},
+		{
+			Addr:   multiSigFeeAddr.String(),
+			Tokens: tokensFee,
+		},
 	}
 
 	builder.SetMetaData(metadataBytes).SetTestNetMagic(testNetMagic)
 	builder.AddOutputs(outputs...)
 	builder.AddInputsWithScript(policyScriptMultiSig, multiSigInputs.Inputs...)
 	builder.AddInputsWithScript(policyScriptFeeMultiSig, multiSigFeeInputs.Inputs...)
-
-	if change := multiSigInputs.Sum - outputsSum; change > 0 {
-		builder.AddOutputs(cardanowallet.TxOutput{
-			Addr: multiSigAddr.String(), Amount: change,
-		})
-	}
-
-	builder.AddOutputs(cardanowallet.TxOutput{Addr: multiSigFeeAddr.String()})
 
 	fee, err := builder.CalculateFee(0)
 	if err != nil {
@@ -247,9 +283,13 @@ func createMultiSigTx(
 
 	builder.SetFee(fee)
 
-	if change := multiSigFeeInputs.Sum - fee; change > 0 {
+	if change := lovelaceInputsFeeSum - fee; change > 0 {
 		builder.UpdateOutputAmount(-1, change)
 	} else {
+		if cnt := len(tokens); cnt > 0 {
+			return nil, "", fmt.Errorf("fee address change is zero but there is %d tokens", cnt)
+		}
+
 		builder.RemoveOutput(-1)
 	}
 
@@ -337,14 +377,20 @@ func loadWallets() ([]cardanowallet.IWallet, error) {
 }
 
 func submitTx(
-	ctx context.Context, txProvider cardanowallet.ITxProvider, txRaw []byte, txHash string, addr string,
+	ctx context.Context,
+	txProvider cardanowallet.ITxProvider,
+	txRaw []byte,
+	txHash string,
+	addr string,
+	tokenName string,
+	amountIncrement uint64,
 ) error {
 	utxo, err := txProvider.GetUtxos(ctx, addr)
 	if err != nil {
 		return err
 	}
 
-	expectedAtLeast := cardanowallet.GetUtxosSum(utxo) + cardanowallet.MinUTxODefaultValue
+	expectedAtLeast := cardanowallet.GetUtxosSum(utxo)[tokenName] + amountIncrement
 
 	if err := txProvider.SubmitTx(context.Background(), txRaw); err != nil {
 		return err
@@ -360,11 +406,11 @@ func submitTx(
 
 		sum := cardanowallet.GetUtxosSum(utxos)
 
-		if sum < expectedAtLeast {
+		if sum[tokenName] < expectedAtLeast {
 			return 0, common.ErrRetryTryAgain
 		}
 
-		return sum, nil
+		return sum[tokenName], nil
 	}, common.WithRetryCount(60))
 	if err != nil {
 		return err
@@ -394,26 +440,55 @@ func main() {
 
 	_, _ = txProvider.GetTip(context.Background())
 
-	sigTx, txHash, err := createTx(
-		cardanoCliBinary, txProvider, wallets[0], testNetMagic, potentialFee, receiverAddr)
+	txRaw, txHash, err := createTx(
+		cardanoCliBinary,
+		txProvider,
+		wallets[0],
+		testNetMagic,
+		receiverAddr,
+		minUtxoValue,
+		potentialFee)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
 
-	if err := submitTx(context.Background(), txProvider, sigTx, txHash, receiverAddr); err != nil {
-		fmt.Printf("error: %v\n", err)
-		os.Exit(1)
-	}
-
-	multiSigTx, multiSigTxHash, err := createMultiSigTx(
-		cardanoCliBinary, txProvider, wallets[:3], wallets[3:], testNetMagic, potentialFee, receiverMultisigAddr)
+	err = submitTx(
+		context.Background(),
+		txProvider,
+		txRaw,
+		txHash,
+		receiverAddr,
+		cardanowallet.AdaTokenName,
+		minUtxoValue)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}
 
-	if err := submitTx(context.Background(), txProvider, multiSigTx, multiSigTxHash, receiverMultisigAddr); err != nil {
+	txRawMultisig, txHashMultisig, err := createMultiSigTx(
+		cardanoCliBinary,
+		txProvider,
+		wallets[:3],
+		wallets[3:],
+		testNetMagic,
+		receiverMultisigAddr,
+		minUtxoValue,
+		potentialFee)
+	if err != nil {
+		fmt.Printf("error: %v\n", err)
+		os.Exit(1)
+	}
+
+	err = submitTx(
+		context.Background(),
+		txProvider,
+		txRawMultisig,
+		txHashMultisig,
+		receiverMultisigAddr,
+		cardanowallet.AdaTokenName,
+		minUtxoValue)
+	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		os.Exit(1)
 	}

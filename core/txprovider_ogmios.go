@@ -30,8 +30,8 @@ func (o *TxProviderOgmios) Dispose() {}
 
 // GetProtocolParameters implements ITxProvider.
 func (o *TxProviderOgmios) GetProtocolParameters(ctx context.Context) ([]byte, error) {
-	params, err := executeHTTPOgmios[queryLedgerStateProtocolParametersResponse](
-		ctx, o.url, queryLedgerState{
+	params, err := executeHTTPOgmios[ogmiosQueryProtocolParamsResponse](
+		ctx, o.url, ogmiosQueryStateRequest{
 			Jsonrpc: ogmiosJSONRPCVersion,
 			Method:  "queryLedgerState/protocolParameters",
 		}, false,
@@ -93,8 +93,8 @@ func (o *TxProviderOgmios) GetProtocolParameters(ctx context.Context) ([]byte, e
 
 // GetSlot implements ITxProvider.
 func (o *TxProviderOgmios) GetTip(ctx context.Context) (QueryTipData, error) {
-	heightResponse, err := executeHTTPOgmios[queryNetworkBlockHeightResponse](
-		ctx, o.url, queryLedgerState{
+	heightResponse, err := executeHTTPOgmios[ogmiosQueryNetworkBlockHeightResponse](
+		ctx, o.url, ogmiosQueryStateRequest{
 			Jsonrpc: ogmiosJSONRPCVersion,
 			Method:  "queryNetwork/blockHeight",
 		}, false,
@@ -103,8 +103,8 @@ func (o *TxProviderOgmios) GetTip(ctx context.Context) (QueryTipData, error) {
 		return QueryTipData{}, err
 	}
 
-	tipResponse, err := executeHTTPOgmios[queryLedgerStateTipResponse](
-		ctx, o.url, queryLedgerState{
+	tipResponse, err := executeHTTPOgmios[ogmiosQueryTipResponse](
+		ctx, o.url, ogmiosQueryStateRequest{
 			Jsonrpc: ogmiosJSONRPCVersion,
 			Method:  "queryLedgerState/tip",
 		}, false,
@@ -122,11 +122,11 @@ func (o *TxProviderOgmios) GetTip(ctx context.Context) (QueryTipData, error) {
 
 // GetUtxos implements ITxProvider.
 func (o *TxProviderOgmios) GetUtxos(ctx context.Context, addr string) ([]Utxo, error) {
-	responseData, err := executeHTTPOgmios[queryLedgerStateUtxoResponse](
-		ctx, o.url, queryLedgerStateUtxo{
+	responseData, err := executeHTTPOgmios[ogmiosQueryUtxoResponse](
+		ctx, o.url, ogmiosQueryUtxoRequest{
 			Jsonrpc: ogmiosJSONRPCVersion,
 			Method:  "queryLedgerState/utxo",
-			Params: queryLedgerStateUtxoParams{
+			Params: ogmiosQueryUtxoRequestParams{
 				Addresses: []string{addr},
 			},
 		}, true,
@@ -137,10 +137,39 @@ func (o *TxProviderOgmios) GetUtxos(ctx context.Context, addr string) ([]Utxo, e
 
 	var retVal = make([]Utxo, len(responseData.Result))
 	for i, utxo := range responseData.Result {
+		var (
+			adaValue uint64
+			tokens   []TokenAmount
+		)
+
+		if len(utxo.Value) > 1 {
+			tokens = make([]TokenAmount, 0, len(utxo.Value)-1)
+		}
+
+		for policyID, nameValueMap := range utxo.Value {
+			if policyID == AdaTokenPolicyID {
+				adaValue = nameValueMap[AdaTokenName]
+			} else {
+				for name, value := range nameValueMap {
+					realName, err := hex.DecodeString(name)
+					if err == nil {
+						name = string(realName)
+					}
+
+					tokens = append(tokens, TokenAmount{
+						PolicyID: policyID,
+						Name:     name,
+						Amount:   value,
+					})
+				}
+			}
+		}
+
 		retVal[i] = Utxo{
 			Hash:   utxo.Transaction.ID,
 			Index:  utxo.Index,
-			Amount: utxo.Value.Ada.Lovelace,
+			Amount: adaValue,
+			Tokens: tokens,
 		}
 	}
 

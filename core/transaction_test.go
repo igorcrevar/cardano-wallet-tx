@@ -3,7 +3,7 @@ package core
 import (
 	"encoding/hex"
 	"encoding/json"
-	"strings"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -78,7 +78,7 @@ func Test_TransactionBuilder(t *testing.T) {
 	outputs := []TxOutput{
 		{
 			Addr:   "addr_test1vqjysa7p4mhu0l25qknwznvj0kghtr29ud7zp732ezwtzec0w8g3u",
-			Amount: MinUTxODefaultValue,
+			Amount: uint64(1_000_000),
 		},
 	}
 	outputsSum := GetOutputsSum(outputs)
@@ -102,7 +102,9 @@ func Test_TransactionBuilder(t *testing.T) {
 				Index: 2,
 			},
 		},
-		Sum: MinUTxODefaultValue*3 - 10,
+		Sum: map[string]uint64{
+			AdaTokenName: uint64(1_000_000)*3 - 10,
+		},
 	}
 
 	multiSigFeeInputs := TxInputs{
@@ -112,7 +114,9 @@ func Test_TransactionBuilder(t *testing.T) {
 				Index: 0,
 			},
 		},
-		Sum: MinUTxODefaultValue * 2,
+		Sum: map[string]uint64{
+			AdaTokenName: uint64(1_000_000) * 2,
+		},
 	}
 
 	builder.SetTimeToLive(ttl).SetProtocolParameters(protocolParameters)
@@ -130,8 +134,8 @@ func Test_TransactionBuilder(t *testing.T) {
 
 	builder.SetFee(fee)
 
-	builder.UpdateOutputAmount(-2, multiSigInputs.Sum-outputsSum)
-	builder.UpdateOutputAmount(-1, multiSigFeeInputs.Sum-fee)
+	builder.UpdateOutputAmount(-2, multiSigInputs.Sum[AdaTokenName]-outputsSum[AdaTokenName])
+	builder.UpdateOutputAmount(-1, multiSigFeeInputs.Sum[AdaTokenName]-fee)
 
 	txRaw, txHash, err := builder.Build()
 	require.NoError(t, err)
@@ -211,37 +215,21 @@ func Test_TxBuilder_CheckOutputs(t *testing.T) {
 
 	b.AddOutputs(TxOutput{
 		Addr:   "x1",
-		Amount: MinUTxODefaultValue,
+		Amount: 2,
 	}, TxOutput{
 		Addr:   "x2",
-		Amount: MinUTxODefaultValue + 1,
+		Amount: 1,
 	})
 
 	require.NoError(t, b.CheckOutputs())
 
 	b.AddOutputs(TxOutput{
 		Addr:   "x3",
-		Amount: MinUTxODefaultValue - 1,
+		Amount: 2,
 	}, TxOutput{
 		Addr:   "x4",
-		Amount: MinUTxODefaultValue - 2,
+		Amount: 0,
 	})
 
-	err = b.CheckOutputs()
-	require.Error(t, err)
-
-	require.True(t, strings.Contains(err.Error(), "output (2, x3) has insufficient amount 999999"))
-	require.True(t, strings.Contains(err.Error(), "output (3, x4) has insufficient amount 999998"))
-
-	b.SetMinOutputAmount(MinUTxODefaultValue - 1)
-
-	err = b.CheckOutputs()
-	require.Error(t, err)
-
-	require.False(t, strings.Contains(err.Error(), "output (2, x3) has insufficient amount 999999"))
-	require.True(t, strings.Contains(err.Error(), "output (3, x4) has insufficient amount 999998"))
-
-	b.SetMinOutputAmount(MinUTxODefaultValue - 2)
-
-	require.NoError(t, b.CheckOutputs())
+	require.Error(t, b.CheckOutputs(), errors.New("output (x4, 3) amount not specified"))
 }

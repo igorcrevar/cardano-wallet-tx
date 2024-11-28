@@ -1,6 +1,6 @@
 module github.com/igorcrevar/cardano-wallet-tx
 
-go 1.20
+go 1.21
 
 require github.com/fxamacker/cbor/v2 v2.6.0
 

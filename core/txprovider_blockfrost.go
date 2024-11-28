@@ -3,12 +3,24 @@ package core
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 )
+
+type blockFrostQueryUtxoResponse struct {
+	Address     string `json:"address"`
+	Hash        string `json:"tx_hash"`
+	Index       uint32 `json:"tx_index"`
+	OutputIndex uint32 `json:"output_index"`
+	Amount      []struct {
+		Unit     string `json:"unit"`
+		Quantity string `json:"quantity"`
+	} `json:"amount"`
+}
 
 type TxProviderBlockFrost struct {
 	url       string
@@ -85,34 +97,48 @@ func (b *TxProviderBlockFrost) GetUtxos(ctx context.Context, addr string) ([]Utx
 		return nil, getErrorFromResponse(resp)
 	}
 
-	var responseData []map[string]interface{}
-	if err = json.NewDecoder(resp.Body).Decode(&responseData); err != nil {
+	var bfResponse []blockFrostQueryUtxoResponse
+	if err = json.NewDecoder(resp.Body).Decode(&bfResponse); err != nil {
 		return nil, err
 	}
 
-	response := make([]Utxo, len(responseData))
+	response := make([]Utxo, len(bfResponse))
 
-	for i, v := range responseData {
-		amount := uint64(0)
+	for i, bfUtxo := range bfResponse {
+		var (
+			tokens []TokenAmount
+			amount uint64
+		)
 
-		//nolint:forcetypeassert
-		for _, item := range v["amount"].([]interface{}) {
-			itemMap := item.(map[string]interface{})
-			if itemMap["unit"].(string) == "lovelace" {
-				amount, err = strconv.ParseUint(itemMap["quantity"].(string), 10, 64)
-				if err != nil {
-					return nil, err
+		for _, x := range bfUtxo.Amount {
+			tmpAmount, err := strconv.ParseUint(x.Quantity, 0, 64)
+			if err != nil {
+				return nil, err
+			}
+
+			if x.Unit == AdaTokenName {
+				amount = tmpAmount
+			} else {
+				policyID, name := x.Unit[0:KeyHashSize*2], x.Unit[KeyHashSize*2:]
+
+				realName, err := hex.DecodeString(name)
+				if err == nil {
+					name = string(realName)
 				}
 
-				break
+				tokens = append(tokens, TokenAmount{
+					PolicyID: policyID,
+					Name:     name,
+					Amount:   tmpAmount,
+				})
 			}
 		}
 
-		//nolint:forcetypeassert
 		response[i] = Utxo{
-			Hash:   v["tx_hash"].(string),
-			Index:  uint32(v["output_index"].(float64)),
+			Hash:   bfUtxo.Hash,
+			Index:  bfUtxo.Index,
 			Amount: amount,
+			Tokens: tokens,
 		}
 	}
 
@@ -143,18 +169,18 @@ func (b *TxProviderBlockFrost) GetTip(ctx context.Context) (QueryTipData, error)
 		return QueryTipData{}, getErrorFromResponse(resp)
 	}
 
-	var responseData map[string]interface{}
-	if err = json.NewDecoder(resp.Body).Decode(&responseData); err != nil {
+	var bfResponse map[string]interface{}
+	if err = json.NewDecoder(resp.Body).Decode(&bfResponse); err != nil {
 		return QueryTipData{}, err
 	}
 
 	//nolint:forcetypeassert
 	return QueryTipData{
-		Slot:        uint64(responseData["slot"].(float64)),
-		Block:       uint64(responseData["height"].(float64)),
-		Epoch:       uint64(responseData["epoch"].(float64)),
-		SlotInEpoch: uint64(responseData["epoch_slot"].(float64)),
-		Hash:        responseData["hash"].(string),
+		Slot:        uint64(bfResponse["slot"].(float64)),
+		Block:       uint64(bfResponse["height"].(float64)),
+		Epoch:       uint64(bfResponse["epoch"].(float64)),
+		SlotInEpoch: uint64(bfResponse["epoch_slot"].(float64)),
+		Hash:        bfResponse["hash"].(string),
 	}, nil
 }
 
@@ -209,12 +235,12 @@ func (b *TxProviderBlockFrost) GetTxByHash(ctx context.Context, hash string) (ma
 		return nil, getErrorFromResponse(resp)
 	}
 
-	var responseData map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&responseData); err != nil {
+	var bfResponse map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&bfResponse); err != nil {
 		return nil, err
 	}
 
-	return responseData, nil
+	return bfResponse, nil
 }
 
 func convertProtocolParameters(bytes []byte) ([]byte, error) {
@@ -277,10 +303,10 @@ func convertProtocolParameters(bytes []byte) ([]byte, error) {
 }
 
 func getErrorFromResponse(resp *http.Response) error {
-	var responseData map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&responseData); err != nil {
+	var bfResponse map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&bfResponse); err != nil {
 		return fmt.Errorf("status code %d", resp.StatusCode)
 	}
 
-	return fmt.Errorf("status code %d: %s", resp.StatusCode, responseData["message"])
+	return fmt.Errorf("status code %d: %s", resp.StatusCode, bfResponse["message"])
 }

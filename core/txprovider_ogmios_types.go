@@ -1,43 +1,37 @@
 package core
 
-type queryLedgerStateUtxoParams struct {
+type ogmiosQueryStateRequest struct {
+	Jsonrpc string      `json:"jsonrpc"`
+	Method  string      `json:"method"`
+	ID      interface{} `json:"id"`
+}
+
+type ogmiosQueryUtxoRequestParams struct {
 	Addresses []string `json:"addresses"`
 }
 
-type queryLedgerStateUtxo struct {
-	Jsonrpc string                     `json:"jsonrpc"`
-	Method  string                     `json:"method"`
-	Params  queryLedgerStateUtxoParams `json:"params"`
-	ID      interface{}                `json:"id"`
+type ogmiosQueryUtxoRequest struct {
+	Jsonrpc string                       `json:"jsonrpc"`
+	Method  string                       `json:"method"`
+	Params  ogmiosQueryUtxoRequestParams `json:"params"`
+	ID      interface{}                  `json:"id"`
 }
 
-type queryLedgerStateUtxoResponseResultTransaction struct {
-	ID string `json:"id"`
+type ogmiosQueryUtxoResponse struct {
+	Jsonrpc string `json:"jsonrpc"`
+	Method  string `json:"method"`
+	Result  []struct {
+		Transaction struct {
+			ID string `json:"id"`
+		} `json:"transaction"`
+		Index   uint32                       `json:"index"`
+		Address string                       `json:"address"`
+		Value   map[string]map[string]uint64 `json:"value"`
+	} `json:"result"`
+	ID interface{} `json:"id"`
 }
 
-type queryLedgerStateUtxoResponseResultValueAda struct {
-	Lovelace uint64 `json:"lovelace"`
-}
-
-type queryLedgerStateUtxoResponseResultValue struct {
-	Ada queryLedgerStateUtxoResponseResultValueAda `json:"ada"`
-}
-
-type queryLedgerStateUtxoResponseResult struct {
-	Transaction queryLedgerStateUtxoResponseResultTransaction `json:"transaction"`
-	Index       uint32                                        `json:"index"`
-	Address     string                                        `json:"address"`
-	Value       queryLedgerStateUtxoResponseResultValue       `json:"value"`
-}
-
-type queryLedgerStateUtxoResponse struct {
-	Jsonrpc string                               `json:"jsonrpc"`
-	Method  string                               `json:"method"`
-	Result  []queryLedgerStateUtxoResponseResult `json:"result"`
-	ID      interface{}                          `json:"id"`
-}
-
-type queryLedgerStateProtocolParametersResponse struct {
+type ogmiosQueryProtocolParamsResponse struct {
 	Jsonrpc string `json:"jsonrpc"`
 	Method  string `json:"method"`
 	Result  struct {
@@ -108,7 +102,7 @@ type queryLedgerStateProtocolParametersResponse struct {
 	ID interface{} `json:"id"`
 }
 
-type queryLedgerStateTipResponse struct {
+type ogmiosQueryTipResponse struct {
 	Jsonrpc string `json:"jsonrpc"`
 	Method  string `json:"method"`
 	Result  struct {
@@ -116,12 +110,6 @@ type queryLedgerStateTipResponse struct {
 		ID   string `json:"id"`
 	} `json:"result"`
 	ID interface{} `json:"id"`
-}
-
-type queryLedgerState struct {
-	Jsonrpc string      `json:"jsonrpc"`
-	Method  string      `json:"method"`
-	ID      interface{} `json:"id"`
 }
 
 type ogmiosSubmitTransactionParamsTransaction struct {
@@ -158,7 +146,7 @@ type ogmiosSubmitTransactionResponse struct {
 	ID interface{} `json:"id"`
 }
 
-type queryNetworkBlockHeightResponse struct {
+type ogmiosQueryNetworkBlockHeightResponse struct {
 	Jsonrpc string      `json:"jsonrpc"`
 	Method  string      `json:"method"`
 	Result  uint64      `json:"result"`
