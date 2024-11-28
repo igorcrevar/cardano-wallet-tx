@@ -6,4 +6,4 @@ A Go wrapper around the Cardano CLI that offers the following features:
 - Transaction hash signing and assembling signatures into the final transaction
 - Query UTXOs, slot, protocol parameters, and submit transactions with Ogmios, Blockfrost or CLI
 
-Note: It only supports simple money transfer transactions; there is no functionality for smart contracts, etc.
+Note: It only supports simple money transfer transactions (including tokens/native assets); there is no functionality for smart contracts, etc.

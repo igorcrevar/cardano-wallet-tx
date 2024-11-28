@@ -78,13 +78,13 @@ func TestKeyHash(t *testing.T) {
 		wallet, err := GenerateWallet(true)
 		require.NoError(t, err)
 
-		keyHash, err := GetKeyHash(wallet.GetVerificationKey())
+		keyHash, err := GetKeyHash(wallet.VerificationKey)
 		require.NoError(t, err)
 
 		verificationKeyFile := filepath.Join(baseDirectory, fmt.Sprintf("key-%d.key", i+1))
 
 		key, err := NewKeyFromBytes(
-			PaymentVerificationKeyShelley, PaymentVerificationKeyShelleyDesc, wallet.GetVerificationKey())
+			PaymentVerificationKeyShelley, PaymentVerificationKeyShelleyDesc, wallet.VerificationKey)
 		require.NoError(t, err)
 
 		require.NoError(t, key.WriteToFile(verificationKeyFile))
@@ -102,7 +102,7 @@ func TestKeyHash(t *testing.T) {
 		keyBytes, err := key.GetKeyBytes()
 		require.NoError(t, err)
 
-		assert.Equal(t, wallet.GetVerificationKey(), keyBytes)
+		assert.Equal(t, wallet.VerificationKey, keyBytes)
 	}
 }
 
@@ -143,11 +143,11 @@ func TestWalletExtended(t *testing.T) {
 	signature, err := SignMessage(wc.Wallet.SigningKey, wc.Wallet.VerificationKey, []byte(msg1))
 	require.NoError(t, err)
 
-	signature2, err := SignMessage(wc.WalletStake.GetStakeSigningKey(),
+	signature2, err := SignMessage(wc.WalletStake.StakeSigningKey,
 		wc.WalletStake.StakeVerificationKey, []byte(msg2))
 	require.NoError(t, err)
 
-	signature3, err := SignMessage(wc.WalletStake.GetSigningKey(), wc.WalletStake.VerificationKey, []byte(msg3))
+	signature3, err := SignMessage(wc.WalletStake.SigningKey, wc.WalletStake.VerificationKey, []byte(msg3))
 	require.NoError(t, err)
 
 	require.NoError(t, VerifyMessage([]byte(msg1), wc.Wallet.VerificationKey, signature))
@@ -156,18 +156,6 @@ func TestWalletExtended(t *testing.T) {
 	require.Error(t, VerifyMessage([]byte(msg3), wc.Wallet.VerificationKey, signature))
 	require.Error(t, VerifyMessage([]byte(msg1), wc.WalletStake.StakeVerificationKey, signature2))
 	require.Error(t, VerifyMessage([]byte(msg2), wc.WalletStake.VerificationKey, signature3))
-}
-
-func TestCreateTxWitness(t *testing.T) {
-	t.Parallel()
-
-	wallet, err := GenerateWallet(true)
-	require.NoError(t, err)
-
-	bytes, err := CreateTxWitness("8810020F", wallet)
-	require.NoError(t, err)
-
-	require.True(t, len(bytes) > KeySize)
 }
 
 func TestGetKeyBytes(t *testing.T) {

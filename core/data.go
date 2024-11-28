@@ -101,15 +101,9 @@ type ITxProvider interface {
 	Dispose()
 }
 
-type ISigner interface {
-	GetSigningKey() []byte
-	GetVerificationKey() []byte
-}
-
-type IWallet interface {
-	ISigner
-	GetStakeSigningKey() []byte
-	GetStakeVerificationKey() []byte
+type ITxSigner interface {
+	SignTransaction([]byte) ([]byte, error)
+	GetTransactionVerificationKey() []byte
 }
 
 type IPolicyScript interface {

@@ -101,41 +101,20 @@ func GetKeyHash(bytes []byte) (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-// GenerateWallet generates wallet
-func GenerateWallet(isStake bool) (*Wallet, error) {
-	signingKey, verificationKey, err := GenerateKeyPair()
-	if err != nil {
-		return nil, err
+// PadKeyToSize pads key to 32 bytes
+func PadKeyToSize(key []byte) []byte {
+	// If the key is already 32 bytes long, return it as is
+	if len(key) == KeySize {
+		return key
 	}
 
-	if !isStake {
-		return NewWallet(verificationKey, signingKey), nil
+	// If the key is shorter than 32 bytes, pad with leading zeroes
+	if len(key) < KeySize {
+		return append(make([]byte, KeySize-len(key)), key...)
 	}
 
-	stakeSigningKey, stakeVerificationKey, err := GenerateKeyPair()
-	if err != nil {
-		return nil, err
-	}
-
-	return NewStakeWallet(verificationKey, signingKey, stakeVerificationKey, stakeSigningKey), nil
-}
-
-// CreateTxWitness signs transaction hash and creates witness cbor
-func CreateTxWitness(txHash string, wallet ISigner) ([]byte, error) {
-	txHashBytes, err := hex.DecodeString(txHash)
-	if err != nil {
-		return nil, err
-	}
-
-	result, err := SignMessage(wallet.GetSigningKey(), wallet.GetVerificationKey(), txHashBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return cbor.Marshal([][]byte{
-		wallet.GetVerificationKey(),
-		result,
-	})
+	// If the key is longer than 32 bytes, truncate it to 32 bytes
+	return key[:KeySize]
 }
 
 // GetKeyBytes extracts original key slice from a hex+cbor encoded string

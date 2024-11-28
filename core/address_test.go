@@ -11,20 +11,22 @@ func TestAddressParts(t *testing.T) {
 	wallet1, err := GenerateWallet(true)
 	require.NoError(t, err)
 
-	wallet3 := NewWallet(wallet1.GetVerificationKey(), wallet1.GetSigningKey())
+	wallet3 := NewWallet(wallet1.VerificationKey, wallet1.SigningKey)
 
 	cliUtils := NewCliUtils(ResolveCardanoCliBinary(TestNetNetwork))
 
-	wallet1KeyHash, err := GetKeyHash(wallet1.GetVerificationKey())
+	wallet1KeyHash, err := GetKeyHash(wallet1.VerificationKey)
 	require.NoError(t, err)
 
-	wallet1StakeKeyHash, err := GetKeyHash(wallet1.GetStakeVerificationKey())
+	wallet1StakeKeyHash, err := GetKeyHash(wallet1.StakeVerificationKey)
 	require.NoError(t, err)
 
-	walletAddress, walletStakeAddress, err := cliUtils.GetWalletAddress(wallet1, TestNetProtocolMagic)
+	walletAddress, walletStakeAddress, err := cliUtils.GetWalletAddress(
+		wallet1.VerificationKey, wallet1.StakeVerificationKey, TestNetProtocolMagic)
 	require.NoError(t, err)
 
-	wallet3Address, _, err := cliUtils.GetWalletAddress(wallet3, 0)
+	wallet3Address, _, err := cliUtils.GetWalletAddress(
+		wallet3.VerificationKey, wallet3.StakeVerificationKey, 0)
 	require.NoError(t, err)
 
 	cWalletAddress, err := NewAddress(walletAddress)
@@ -38,13 +40,13 @@ func TestAddressParts(t *testing.T) {
 
 	assert.Equal(t, walletAddress, cWalletAddress.String())
 
-	baseAddr, err := NewBaseAddress(TestNetNetwork, wallet1.GetVerificationKey(), wallet1.GetStakeVerificationKey())
+	baseAddr, err := NewBaseAddress(TestNetNetwork, wallet1.VerificationKey, wallet1.StakeVerificationKey)
 	require.NoError(t, err)
 
-	rewardAddr, err := NewRewardAddress(TestNetNetwork, wallet1.GetStakeVerificationKey())
+	rewardAddr, err := NewRewardAddress(TestNetNetwork, wallet1.StakeVerificationKey)
 	require.NoError(t, err)
 
-	enterpriseAddr, err := NewEnterpriseAddress(MainNetNetwork, wallet1.GetVerificationKey())
+	enterpriseAddr, err := NewEnterpriseAddress(MainNetNetwork, wallet1.VerificationKey)
 	require.NoError(t, err)
 
 	assert.Equal(t, walletAddress, baseAddr.String())

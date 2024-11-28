@@ -47,20 +47,31 @@ func NewStakeWallet(verificationKey []byte, signingKey []byte,
 	}
 }
 
-func (w Wallet) GetVerificationKey() []byte {
+// GenerateWallet generates wallet
+func GenerateWallet(isStake bool) (*Wallet, error) {
+	signingKey, verificationKey, err := GenerateKeyPair()
+	if err != nil {
+		return nil, err
+	}
+
+	if !isStake {
+		return NewWallet(verificationKey, signingKey), nil
+	}
+
+	stakeSigningKey, stakeVerificationKey, err := GenerateKeyPair()
+	if err != nil {
+		return nil, err
+	}
+
+	return NewStakeWallet(verificationKey, signingKey, stakeVerificationKey, stakeSigningKey), nil
+}
+
+func (w Wallet) SignTransaction(txRaw []byte) ([]byte, error) {
+	return SignMessage(w.SigningKey, w.VerificationKey, txRaw)
+}
+
+func (w Wallet) GetTransactionVerificationKey() []byte {
 	return w.VerificationKey
-}
-
-func (w Wallet) GetSigningKey() []byte {
-	return w.SigningKey
-}
-
-func (w Wallet) GetStakeVerificationKey() []byte {
-	return w.StakeVerificationKey
-}
-
-func (w Wallet) GetStakeSigningKey() []byte {
-	return w.StakeSigningKey
 }
 
 type Key struct {
@@ -112,19 +123,4 @@ func (k Key) WriteToFile(filePath string) error {
 	}
 
 	return nil
-}
-
-func PadKeyToSize(key []byte) []byte {
-	// If the key is already 32 bytes long, return it as is
-	if len(key) == KeySize {
-		return key
-	}
-
-	// If the key is shorter than 32 bytes, pad with leading zeroes
-	if len(key) < KeySize {
-		return append(make([]byte, KeySize-len(key)), key...)
-	}
-
-	// If the key is longer than 32 bytes, truncate it to 32 bytes
-	return key[:KeySize]
 }

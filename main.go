@@ -19,7 +19,7 @@ const (
 	potentialFee            = uint64(300_000)
 	providerName            = "blockfrost"
 	receiverAddr            = "addr_test1wz4k6frsfd9q98rya6zjxtpcmzn83pwc8uyl9yqw25p8qqcx3e0c0"
-	receiverMultisigAddr    = "addr_test1vrhltc3r25sha3khwrpkdqqscfmplgyx8tap96tvl79zypgr4mc9f"
+	receiverMultisigAddr    = "addr_test1wqh4yha0ndhwykrh9cuhr47nh2y97zvkls74h4jq6uhlpacujv3z3"
 	minUtxoValue            = uint64(1_000_000)
 )
 
@@ -36,10 +36,10 @@ func getSplitedStr(s string, mxlen int) (res []string) {
 	return res
 }
 
-func getKeyHashes(wallets []cardanowallet.IWallet) []string {
+func getKeyHashes(wallets []*cardanowallet.Wallet) []string {
 	keyHashes := make([]string, len(wallets))
 	for i, w := range wallets {
-		keyHashes[i], _ = cardanowallet.GetKeyHash(w.GetVerificationKey())
+		keyHashes[i], _ = cardanowallet.GetKeyHash(w.VerificationKey)
 	}
 
 	return keyHashes
@@ -48,14 +48,14 @@ func getKeyHashes(wallets []cardanowallet.IWallet) []string {
 func createTx(
 	cardanoCliBinary string,
 	txProvider cardanowallet.ITxProvider,
-	wallet cardanowallet.IWallet,
+	wallet *cardanowallet.Wallet,
 	testNetMagic uint,
 	receiverAddr string,
 	lovelaceSendAmount uint64,
 	potentialFee uint64,
 ) ([]byte, string, error) {
 	enterptiseAddress, err := cardanowallet.NewEnterpriseAddress(
-		cardanowallet.TestNetNetwork, wallet.GetVerificationKey())
+		cardanowallet.TestNetNetwork, wallet.VerificationKey)
 	if err != nil {
 		return nil, "", err
 	}
@@ -128,24 +128,19 @@ func createTx(
 		return nil, "", err
 	}
 
-	witness, err := cardanowallet.CreateTxWitness(txHash, wallet)
+	txSignedRaw, err := builder.SignTx(txRaw, wallet)
 	if err != nil {
 		return nil, "", err
 	}
 
-	txSigned, err := builder.AssembleTxWitnesses(txRaw, [][]byte{witness})
-	if err != nil {
-		return nil, "", err
-	}
-
-	return txSigned, txHash, nil
+	return txSignedRaw, txHash, nil
 }
 
 func createMultiSigTx(
 	cardanoCliBinary string,
 	txProvider cardanowallet.ITxProvider,
-	signers []cardanowallet.IWallet,
-	feeSigners []cardanowallet.IWallet,
+	signers []*cardanowallet.Wallet,
+	feeSigners []*cardanowallet.Wallet,
 	testNetMagic uint,
 	receiverAddr string,
 	lovelaceSendAmount uint64,
@@ -298,35 +293,21 @@ func createMultiSigTx(
 		return nil, "", err
 	}
 
-	witnesses := make([][]byte, len(signers)+len(feeSigners))
+	allTxSigners := make([]cardanowallet.ITxSigner, len(feeSigners)+len(signers))
 	for i, w := range signers {
-		witnesses[i], err = cardanowallet.CreateTxWitness(txHash, w)
-		if err != nil {
-			return nil, "", err
-		}
-
-		if err := cardanowallet.VerifyWitness(txHash, witnesses[i]); err != nil {
-			return nil, "", err
-		}
+		allTxSigners[i] = w
 	}
 
 	for i, w := range feeSigners {
-		witnesses[i+len(signers)], err = cardanowallet.CreateTxWitness(txHash, w)
-		if err != nil {
-			return nil, "", err
-		}
-
-		if err := cardanowallet.VerifyWitness(txHash, witnesses[i+len(signers)]); err != nil {
-			return nil, "", err
-		}
+		allTxSigners[i+len(signers)] = w
 	}
 
-	txSigned, err := builder.AssembleTxWitnesses(txRaw, witnesses)
+	txSignedRaw, err := builder.SignTx(txRaw, allTxSigners...)
 	if err != nil {
 		return nil, "", err
 	}
 
-	return txSigned, txHash, nil
+	return txSignedRaw, txHash, nil
 }
 
 func createProvider(name string, cardanoCliBinary string) (cardanowallet.ITxProvider, error) {
@@ -340,7 +321,7 @@ func createProvider(name string, cardanoCliBinary string) (cardanowallet.ITxProv
 	}
 }
 
-func loadWallets() ([]cardanowallet.IWallet, error) {
+func loadWallets() ([]*cardanowallet.Wallet, error) {
 	verificationKeys := []string{
 		"582068fc463c29900b00122423c7e6a39469987786314e07a5e7f5eae76a5fe671bf",
 		"58209a9cefaa636d75dffa3a3a5ab446a191beac92b09ac82da513640e8e35935202",
@@ -358,7 +339,7 @@ func loadWallets() ([]cardanowallet.IWallet, error) {
 		"582058fb35da120c65855ad691dadf5681a2e4fc62e9dcda0d0774ff6fdc463a679a",
 	}
 
-	wallets := make([]cardanowallet.IWallet, len(verificationKeys))
+	wallets := make([]*cardanowallet.Wallet, len(verificationKeys))
 	for i := range verificationKeys {
 		signingKey, err := cardanowallet.GetKeyBytes(signingKeys[i])
 		if err != nil {
@@ -385,16 +366,16 @@ func submitTx(
 	tokenName string,
 	amountIncrement uint64,
 ) error {
-	utxo, err := txProvider.GetUtxos(ctx, addr)
+	utxos, err := txProvider.GetUtxos(ctx, addr)
 	if err != nil {
 		return err
 	}
 
-	expectedAtLeast := cardanowallet.GetUtxosSum(utxo)[tokenName] + amountIncrement
-
 	if err := txProvider.SubmitTx(context.Background(), txRaw); err != nil {
 		return err
 	}
+
+	expectedAtLeast := cardanowallet.GetUtxosSum(utxos)[tokenName] + amountIncrement
 
 	fmt.Println("transaction has been submitted. hash =", txHash)
 

@@ -126,7 +126,9 @@ func (cu CliUtils) GetAddressInfo(address string) (AddressInfo, error) {
 }
 
 // GetWalletAddress returns address and stake address for wallet (if wallet is stake wallet)
-func (cu CliUtils) GetWalletAddress(wallet IWallet, testNetMagic uint) (addr string, stakeAddr string, err error) {
+func (cu CliUtils) GetWalletAddress(
+	verificationKey, stakeVerificationKey []byte, testNetMagic uint,
+) (addr string, stakeAddr string, err error) {
 	baseDirectory, err := os.MkdirTemp("", "get-address")
 	if err != nil {
 		return "", "", err
@@ -135,7 +137,7 @@ func (cu CliUtils) GetWalletAddress(wallet IWallet, testNetMagic uint) (addr str
 	defer os.RemoveAll(baseDirectory)
 
 	key, err := NewKeyFromBytes(
-		PaymentVerificationKeyShelley, PaymentVerificationKeyShelleyDesc, wallet.GetVerificationKey())
+		PaymentVerificationKeyShelley, PaymentVerificationKeyShelleyDesc, verificationKey)
 	if err != nil {
 		return "", "", nil
 	}
@@ -148,7 +150,7 @@ func (cu CliUtils) GetWalletAddress(wallet IWallet, testNetMagic uint) (addr str
 	}
 
 	// enterprise address
-	if len(wallet.GetStakeVerificationKey()) == 0 {
+	if len(stakeVerificationKey) == 0 {
 		addr, err = runCommand(cu.cardanoCliBinary, append([]string{
 			"address", "build",
 			"--payment-verification-key-file", verificationFilePath,
@@ -158,7 +160,7 @@ func (cu CliUtils) GetWalletAddress(wallet IWallet, testNetMagic uint) (addr str
 	}
 
 	stakeKey, err := NewKeyFromBytes(
-		StakeVerificationKeyShelley, StakeVerificationKeyShelleyDesc, wallet.GetStakeVerificationKey())
+		StakeVerificationKeyShelley, StakeVerificationKeyShelleyDesc, stakeVerificationKey)
 	if err != nil {
 		return "", "", nil
 	}
