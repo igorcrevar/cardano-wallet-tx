@@ -362,7 +362,7 @@ func (b *TxBuilder) AssembleTxWitnesses(txRaw []byte, witnesses [][]byte) ([]byt
 	for i, witness := range witnesses {
 		witnessesFilePaths[i] = filepath.Join(b.baseDirectory, fmt.Sprintf("witness-%d", i+1))
 
-		content, err := txWitnessRaw(witness).ToJSON()
+		content, err := TxWitnessRaw(witness).ToJSON()
 		if err != nil {
 			return nil, err
 		}

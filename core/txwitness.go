@@ -16,6 +16,26 @@ var (
 	txWitnessedJSONDesc   = "Ledger Cddl Format"
 )
 
+type TxWitnessRaw []byte // cbor slice of bytes
+
+func (w TxWitnessRaw) ToJSON() ([]byte, error) {
+	return json.Marshal(map[string]interface{}{
+		"type":        witnessJSONType,
+		"description": witnessJSONDesc,
+		"cborHex":     hex.EncodeToString(w),
+	})
+}
+
+func (w TxWitnessRaw) GetSignatureAndVKey() ([]byte, []byte, error) {
+	var signatureWitness [2][]byte // Use the appropriate type for your CBOR structure
+
+	if err := cbor.Unmarshal(w, &signatureWitness); err != nil {
+		return nil, nil, err
+	}
+
+	return signatureWitness[1], signatureWitness[0], nil
+}
+
 type transactionUnwitnessedRaw []byte
 
 func newTransactionUnwitnessedRawFromJSON(bytes []byte) (transactionUnwitnessedRaw, error) {
@@ -64,24 +84,4 @@ func (tx transactionWitnessedRaw) ToJSON() ([]byte, error) {
 		"description": txWitnessedJSONDesc,
 		"cborHex":     hex.EncodeToString(tx),
 	})
-}
-
-type txWitnessRaw []byte // cbor slice of bytes
-
-func (w txWitnessRaw) ToJSON() ([]byte, error) {
-	return json.Marshal(map[string]interface{}{
-		"type":        witnessJSONType,
-		"description": witnessJSONDesc,
-		"cborHex":     hex.EncodeToString(w),
-	})
-}
-
-func (w txWitnessRaw) GetSignatureAndVKey() ([]byte, []byte, error) {
-	var signatureWitness [2][]byte // Use the appropriate type for your CBOR structure
-
-	if err := cbor.Unmarshal(w, &signatureWitness); err != nil {
-		return nil, nil, err
-	}
-
-	return signatureWitness[1], signatureWitness[0], nil
 }

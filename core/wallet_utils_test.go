@@ -24,7 +24,7 @@ func TestVerifyWitness(t *testing.T) {
 
 	verificationKey := GetVerificationKeyFromSigningKey(signingKey)
 
-	signature, vKeyWitness, err := txWitnessRaw(witnessCbor).GetSignatureAndVKey()
+	signature, vKeyWitness, err := TxWitnessRaw(witnessCbor).GetSignatureAndVKey()
 	require.NoError(t, err)
 
 	require.NoError(t, err)

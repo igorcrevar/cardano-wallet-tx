@@ -37,7 +37,7 @@ func VerifyWitness(txHash string, witness []byte) error {
 		return err
 	}
 
-	signature, vKey, err := txWitnessRaw(witness).GetSignatureAndVKey()
+	signature, vKey, err := TxWitnessRaw(witness).GetSignatureAndVKey()
 	if err != nil {
 		return err
 	}
