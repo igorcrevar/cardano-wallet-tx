@@ -128,7 +128,7 @@ func createTx(
 		return nil, "", err
 	}
 
-	txSignedRaw, err := builder.SignTx(txRaw, wallet)
+	txSignedRaw, err := builder.SignTx(txRaw, []cardano.ITxSigner{wallet})
 	if err != nil {
 		return nil, "", err
 	}
@@ -302,7 +302,7 @@ func createMultiSigTx(
 		allTxSigners[i+len(signers)] = w
 	}
 
-	txSignedRaw, err := builder.SignTx(txRaw, allTxSigners...)
+	txSignedRaw, err := builder.SignTx(txRaw, allTxSigners)
 	if err != nil {
 		return nil, "", err
 	}

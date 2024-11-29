@@ -9,6 +9,7 @@ import (
 	"io"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/igorcrevar/go-cardano-tx/core/bech32"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -36,7 +37,7 @@ func VerifyWitness(txHash string, witness []byte) error {
 		return err
 	}
 
-	signature, vKey, err := TxWitnessRaw(witness).GetSignatureAndVKey()
+	signature, vKey, err := txWitnessRaw(witness).GetSignatureAndVKey()
 	if err != nil {
 		return err
 	}
@@ -117,16 +118,15 @@ func PadKeyToSize(key []byte) []byte {
 	return key[:KeySize]
 }
 
-// GetKeyBytes extracts original key slice from a hex+cbor encoded string
-func GetKeyBytes(key string) ([]byte, error) {
-	bytes, err := hex.DecodeString(key)
-	if err != nil {
-		return nil, err
-	}
-
-	var result []byte
-
-	if err := cbor.Unmarshal(bytes, &result); err != nil {
+// GetKeyBytes extracts the original key bytes from a given string. Supported formats:
+// - Hex + CBOR encoded string: Attempts to decode the key assuming it is hex-encoded,
+// - Bech32 encoded keys: Handles formats like addr_vk, addr_sk, stake_vk, stake_sk
+func GetKeyBytes(key string) (result []byte, err error) {
+	if bytes, err := hex.DecodeString(key); err == nil {
+		if err := cbor.Unmarshal(bytes, &result); err != nil {
+			return nil, err
+		}
+	} else if _, result, err = bech32.DecodeToBase256(key); err != nil {
 		return nil, err
 	}
 

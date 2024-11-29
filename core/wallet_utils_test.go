@@ -3,9 +3,7 @@ package core
 import (
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -26,7 +24,7 @@ func TestVerifyWitness(t *testing.T) {
 
 	verificationKey := GetVerificationKeyFromSigningKey(signingKey)
 
-	signature, vKeyWitness, err := TxWitnessRaw(witnessCbor).GetSignatureAndVKey()
+	signature, vKeyWitness, err := txWitnessRaw(witnessCbor).GetSignatureAndVKey()
 	require.NoError(t, err)
 
 	require.NoError(t, err)
@@ -81,28 +79,10 @@ func TestKeyHash(t *testing.T) {
 		keyHash, err := GetKeyHash(wallet.VerificationKey)
 		require.NoError(t, err)
 
-		verificationKeyFile := filepath.Join(baseDirectory, fmt.Sprintf("key-%d.key", i+1))
-
-		key, err := NewKeyFromBytes(
-			PaymentVerificationKeyShelley, PaymentVerificationKeyShelleyDesc, wallet.VerificationKey)
-		require.NoError(t, err)
-
-		require.NoError(t, key.WriteToFile(verificationKeyFile))
-
-		keyHashCli, err := cliUtils.GetKeyHash(verificationKeyFile)
+		keyHashCli, err := cliUtils.GetKeyHash(wallet.VerificationKey)
 		require.NoError(t, err)
 
 		assert.Equal(t, keyHashCli, keyHash)
-
-		keyFromFile, err := NewKey(verificationKeyFile)
-		require.NoError(t, err)
-
-		assert.Equal(t, keyFromFile, key)
-
-		keyBytes, err := key.GetKeyBytes()
-		require.NoError(t, err)
-
-		assert.Equal(t, wallet.VerificationKey, keyBytes)
 	}
 }
 
@@ -161,24 +141,34 @@ func TestWalletExtended(t *testing.T) {
 func TestGetKeyBytes(t *testing.T) {
 	t.Parallel()
 
-	key, err := GetKeyBytes("58201825bce09711e1563fc1702587da6892d1d869894386323bd4378ea5e3d6cba0")
-	require.NoError(t, err)
+	key1, err := GetKeyBytes("58201825bce09711e1563fc1702587da6892d1d869894386323bd4378ea5e3d6cba0")
 
+	require.NoError(t, err)
 	require.Equal(t, []byte{
 		0x18, 0x25, 0xbc, 0xe0, 0x97, 0x11, 0xe1, 0x56, 0x3f, 0xc1, 0x70, 0x25, 0x87, 0xda, 0x68, 0x92, 0xd1, 0xd8, 0x69, 0x89, 0x43, 0x86, 0x32, 0x3b, 0xd4, 0x37, 0x8e, 0xa5, 0xe3, 0xd6, 0xcb, 0xa0,
-	}, key)
+	}, key1)
 
-	key, err = GetKeyBytes("581Ebce09711e1563fc1702587da6892d1d869894386323bd4378ea5e3d6cba0")
+	key2, err := GetKeyBytes("581Ebce09711e1563fc1702587da6892d1d869894386323bd4378ea5e3d6cba0")
+
 	require.NoError(t, err)
-
 	require.Equal(t, []byte{
 		0x0, 0x0, 0xbc, 0xe0, 0x97, 0x11, 0xe1, 0x56, 0x3f, 0xc1, 0x70, 0x25, 0x87, 0xda, 0x68, 0x92, 0xd1, 0xd8, 0x69, 0x89, 0x43, 0x86, 0x32, 0x3b, 0xd4, 0x37, 0x8e, 0xa5, 0xe3, 0xd6, 0xcb, 0xa0,
-	}, key)
+	}, key2)
 
-	key, err = GetKeyBytes("58221825bce09711e1563fc1702587da6892d1d869894386323bd4378ea5e3d6cba0FFFF")
+	key3, err := GetKeyBytes("58221825bce09711e1563fc1702587da6892d1d869894386323bd4378ea5e3d6cba0FFFF")
+
 	require.NoError(t, err)
-
 	require.Equal(t, []byte{
 		0x18, 0x25, 0xbc, 0xe0, 0x97, 0x11, 0xe1, 0x56, 0x3f, 0xc1, 0x70, 0x25, 0x87, 0xda, 0x68, 0x92, 0xd1, 0xd8, 0x69, 0x89, 0x43, 0x86, 0x32, 0x3b, 0xd4, 0x37, 0x8e, 0xa5, 0xe3, 0xd6, 0xcb, 0xa0,
-	}, key)
+	}, key3)
+
+	for _, key := range [][]byte{key1, key2, key3} {
+		vkey, err := getBech32Key(key, "addr_vk")
+		require.NoError(t, err)
+
+		key2, err := GetKeyBytes(vkey)
+
+		require.NoError(t, err)
+		require.Equal(t, key, key2)
+	}
 }

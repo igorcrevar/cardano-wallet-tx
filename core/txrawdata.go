@@ -16,9 +16,9 @@ var (
 	txWitnessedJSONDesc   = "Ledger Cddl Format"
 )
 
-type TransactionUnwitnessedRaw []byte
+type transactionUnwitnessedRaw []byte
 
-func NewTransactionUnwitnessedRawFromJSON(bytes []byte) (TransactionUnwitnessedRaw, error) {
+func newTransactionUnwitnessedRawFromJSON(bytes []byte) (transactionUnwitnessedRaw, error) {
 	var data map[string]interface{}
 
 	if err := json.Unmarshal(bytes, &data); err != nil {
@@ -33,7 +33,7 @@ func NewTransactionUnwitnessedRawFromJSON(bytes []byte) (TransactionUnwitnessedR
 	return hex.DecodeString(data["cborHex"].(string)) //nolint:forcetypeassert
 }
 
-func (tx TransactionUnwitnessedRaw) ToJSON() ([]byte, error) {
+func (tx transactionUnwitnessedRaw) ToJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
 		"type":        txUnwitnessedJSONType,
 		"description": txUnwitnessedJSONDesc,
@@ -41,9 +41,9 @@ func (tx TransactionUnwitnessedRaw) ToJSON() ([]byte, error) {
 	})
 }
 
-type TransactionWitnessedRaw []byte
+type transactionWitnessedRaw []byte
 
-func NewTransactionWitnessedRawFromJSON(bytes []byte) (TransactionWitnessedRaw, error) {
+func newTransactionWitnessedRawFromJSON(bytes []byte) (transactionWitnessedRaw, error) {
 	var data map[string]interface{}
 
 	if err := json.Unmarshal(bytes, &data); err != nil {
@@ -58,7 +58,7 @@ func NewTransactionWitnessedRawFromJSON(bytes []byte) (TransactionWitnessedRaw, 
 	return hex.DecodeString(data["cborHex"].(string)) //nolint:forcetypeassert
 }
 
-func (tx TransactionWitnessedRaw) ToJSON() ([]byte, error) {
+func (tx transactionWitnessedRaw) ToJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
 		"type":        txWitnessedJSONType,
 		"description": txWitnessedJSONDesc,
@@ -66,9 +66,9 @@ func (tx TransactionWitnessedRaw) ToJSON() ([]byte, error) {
 	})
 }
 
-type TxWitnessRaw []byte // cbor slice of bytes
+type txWitnessRaw []byte // cbor slice of bytes
 
-func (w TxWitnessRaw) ToJSON() ([]byte, error) {
+func (w txWitnessRaw) ToJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
 		"type":        witnessJSONType,
 		"description": witnessJSONDesc,
@@ -76,7 +76,7 @@ func (w TxWitnessRaw) ToJSON() ([]byte, error) {
 	})
 }
 
-func (w TxWitnessRaw) GetSignatureAndVKey() ([]byte, []byte, error) {
+func (w txWitnessRaw) GetSignatureAndVKey() ([]byte, []byte, error) {
 	var signatureWitness [2][]byte // Use the appropriate type for your CBOR structure
 
 	if err := cbor.Unmarshal(w, &signatureWitness); err != nil {

@@ -272,7 +272,7 @@ func (b *TxBuilder) Build() ([]byte, string, error) {
 		return nil, "", err
 	}
 
-	txRaw, err := NewTransactionUnwitnessedRawFromJSON(bytes)
+	txRaw, err := newTransactionUnwitnessedRawFromJSON(bytes)
 	if err != nil {
 		return nil, "", err
 	}
@@ -335,7 +335,7 @@ func (b *TxBuilder) buildRawTx(protocolParamsFilePath string, fee uint64) error 
 }
 
 // SignTx signs tx and assembles all signatures in final tx
-func (b *TxBuilder) SignTx(txRaw []byte, signers ...ITxSigner) ([]byte, error) {
+func (b *TxBuilder) SignTx(txRaw []byte, signers []ITxSigner) ([]byte, error) {
 	txHash, err := NewCliUtils(b.cardanoCliBinary).getTxHash(txRaw, b.baseDirectory)
 	if err != nil {
 		return nil, err
@@ -362,7 +362,7 @@ func (b *TxBuilder) AssembleTxWitnesses(txRaw []byte, witnesses [][]byte) ([]byt
 	for i, witness := range witnesses {
 		witnessesFilePaths[i] = filepath.Join(b.baseDirectory, fmt.Sprintf("witness-%d", i+1))
 
-		content, err := TxWitnessRaw(witness).ToJSON()
+		content, err := txWitnessRaw(witness).ToJSON()
 		if err != nil {
 			return nil, err
 		}
@@ -372,7 +372,7 @@ func (b *TxBuilder) AssembleTxWitnesses(txRaw []byte, witnesses [][]byte) ([]byt
 		}
 	}
 
-	txBytes, err := TransactionUnwitnessedRaw(txRaw).ToJSON()
+	txBytes, err := transactionUnwitnessedRaw(txRaw).ToJSON()
 	if err != nil {
 		return nil, err
 	}
@@ -399,7 +399,7 @@ func (b *TxBuilder) AssembleTxWitnesses(txRaw []byte, witnesses [][]byte) ([]byt
 		return nil, err
 	}
 
-	return NewTransactionWitnessedRawFromJSON(bytes)
+	return newTransactionWitnessedRawFromJSON(bytes)
 }
 
 type txInputWithPolicyScript struct {

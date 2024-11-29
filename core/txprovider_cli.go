@@ -149,7 +149,7 @@ func (b *TxProviderCli) GetTip(_ context.Context) (QueryTipData, error) {
 func (b *TxProviderCli) SubmitTx(_ context.Context, txSigned []byte) error {
 	txFilePath := filepath.Join(b.baseDirectory, "tx.send")
 
-	txBytes, err := TransactionWitnessedRaw(txSigned).ToJSON()
+	txBytes, err := transactionWitnessedRaw(txSigned).ToJSON()
 	if err != nil {
 		return err
 	}
