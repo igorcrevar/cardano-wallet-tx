@@ -3,7 +3,6 @@ package core
 import (
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"sort"
 )
 
@@ -68,36 +67,38 @@ func (ps PolicyScript) GetCount() (cnt int) {
 // GetAddress returns address for this policy script
 func NewPolicyScriptAddress(
 	networkID CardanoNetworkType, policyID string, policyIDStake ...string,
-) (CardanoAddress, error) {
-	getStakeCredential := func(pid string) (StakeCredential, error) {
-		keyHash, err := hex.DecodeString(pid)
-		if err != nil {
-			return StakeCredential{}, fmt.Errorf("failed to decode policy id: %w", err)
-		}
-
-		return NewStakeCredential(keyHash, true)
-	}
-
-	payment, err := getStakeCredential(policyID)
+) (*CardanoAddress, error) {
+	policyIDBytes, err := hex.DecodeString(policyID)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(policyIDStake) == 0 {
-		return &EnterpriseAddress{
-			Network: networkID,
-			Payment: payment,
-		}, nil
+		return CardanoAddressInfo{
+			AddressType: EnterpriseAddress,
+			Network:     networkID,
+			Payment: &CardanoAddressPayload{
+				Payload:  [KeyHashSize]byte(policyIDBytes),
+				IsScript: true,
+			},
+		}.ToCardanoAddress()
 	}
 
-	stake, err := getStakeCredential(policyIDStake[0])
+	policyIDStakeBytes, err := hex.DecodeString(policyIDStake[0])
 	if err != nil {
 		return nil, err
 	}
 
-	return &BaseAddress{
-		Network: networkID,
-		Payment: payment,
-		Stake:   stake,
-	}, nil
+	return CardanoAddressInfo{
+		AddressType: BaseAddress,
+		Network:     networkID,
+		Payment: &CardanoAddressPayload{
+			Payload:  [KeyHashSize]byte(policyIDBytes),
+			IsScript: true,
+		},
+		Stake: &CardanoAddressPayload{
+			Payload:  [KeyHashSize]byte(policyIDStakeBytes),
+			IsScript: true,
+		},
+	}.ToCardanoAddress()
 }

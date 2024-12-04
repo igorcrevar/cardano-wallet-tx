@@ -45,7 +45,7 @@ func TestIsValidCardanoAddress(t *testing.T) {
 
 			assert.NoError(t, err)
 		} else {
-			require.ErrorContains(t, err, ErrInvalidAddressInfo.Error())
+			require.ErrorContains(t, err, ErrInvalidAddressData.Error())
 		}
 	}
 }

@@ -29,14 +29,14 @@ func TestAddressParts(t *testing.T) {
 		wallet3.VerificationKey, wallet3.StakeVerificationKey, 0)
 	require.NoError(t, err)
 
-	cWalletAddress, err := NewAddress(walletAddress)
+	cWalletAddress, err := NewCardanoAddressFromString(walletAddress)
 	require.NoError(t, err)
 
-	assert.Equal(t, wallet1KeyHash, cWalletAddress.GetPayment().String())
-	assert.Equal(t, wallet1StakeKeyHash, cWalletAddress.GetStake().String())
-	assert.False(t, cWalletAddress.GetNetwork().IsMainNet())
-	assert.Equal(t, KeyStakeCredentialType, cWalletAddress.GetPayment().Kind)
-	assert.Equal(t, KeyStakeCredentialType, cWalletAddress.GetStake().Kind)
+	assert.Equal(t, wallet1KeyHash, cWalletAddress.GetInfo().Payment.String())
+	assert.Equal(t, wallet1StakeKeyHash, cWalletAddress.GetInfo().Stake.String())
+	assert.False(t, cWalletAddress.GetInfo().Network.IsMainNet())
+	assert.False(t, cWalletAddress.GetInfo().Payment.IsScript)
+	assert.False(t, cWalletAddress.GetInfo().Stake.IsScript)
 
 	assert.Equal(t, walletAddress, cWalletAddress.String())
 
@@ -82,24 +82,45 @@ func TestNewAddress(t *testing.T) {
 	}
 
 	for i, a := range addresses {
-		addr, err := NewAddress(a)
+		addr, err := NewCardanoAddressFromString(a)
 		assert.NoError(t, err, "%s has error: %v", a, err)
 
 		if err == nil {
-			assert.Equal(t, i <= 10, addr.GetNetwork().IsMainNet(), "%s should be on mainnet: %v", a, i <= 9)
+			assert.Equal(t, i <= 10, addr.GetInfo().Network.IsMainNet(), "%s should be on mainnet: %v", a, i <= 9)
 
 			switch i % 11 {
 			case 0, 1, 2, 3:
-				assert.IsType(t, &BaseAddress{}, addr)
+				assert.Equal(t, BaseAddress, addr.GetInfo().AddressType)
 			case 4, 5:
-				assert.IsType(t, &PointerAddress{}, addr)
+				assert.Equal(t, PointerAddress, addr.GetInfo().AddressType)
 			case 6, 7:
-				assert.IsType(t, &EnterpriseAddress{}, addr)
+				assert.Equal(t, EnterpriseAddress, addr.GetInfo().AddressType)
 			case 8, 9:
-				assert.IsType(t, &RewardAddress{}, addr)
+				assert.Equal(t, RewardAddress, addr.GetInfo().AddressType)
 			}
 
 			assert.Equal(t, a, addr.String())
+
+			newAddr, err := addr.GetInfo().ToCardanoAddress()
+			assert.NoError(t, err)
+
+			if err == nil {
+				assert.Equal(t, a, newAddr.String())
+			}
 		}
+	}
+}
+
+func TestByronAddress(t *testing.T) {
+	// currently not supported
+	addrs := []string{
+		"Ae2tdPwUPEYwFx4dmJheyNPPYXtvHbJLeCaA96o6Y2iiUL18cAt7AizN2zG",
+		"37btjrVyb4KDXBNC4haBVPCrro8AQPHwvCMp3RFhhSVWwfFmZ6wwzSK6JK1hY6wHNmtrpTf1kdbva8TCneM2YsiXT7mrzT21EacHnPpz5YyUdj64na",
+	}
+
+	for _, x := range addrs {
+		_, err := NewCardanoAddressFromString(x)
+
+		require.Error(t, err, ErrUnsupportedAddress)
 	}
 }

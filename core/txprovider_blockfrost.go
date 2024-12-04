@@ -244,62 +244,87 @@ func (b *TxProviderBlockFrost) GetTxByHash(ctx context.Context, hash string) (ma
 }
 
 func convertProtocolParameters(bytes []byte) ([]byte, error) {
-	var jsonMap map[string]interface{}
+	var bfpp struct {
+		ProtocolMajorVer    uint64                      `json:"protocol_major_ver"`
+		ProtocolMinorVer    uint64                      `json:"protocol_minor_ver"`
+		MaxBlockHeaderSize  uint64                      `json:"max_block_header_size"`
+		MaxBlockSize        uint64                      `json:"max_block_size"`
+		MaxTxSize           uint64                      `json:"max_tx_size"`
+		MinFeeB             uint64                      `json:"min_fee_b"`
+		MinFeeA             uint64                      `json:"min_fee_a"`
+		KeyDeposit          string                      `json:"key_deposit"`
+		PoolDeposit         string                      `json:"pool_deposit"`
+		MinPoolCost         string                      `json:"min_pool_cost"`
+		EMax                uint64                      `json:"e_max"`
+		NOpt                uint64                      `json:"n_opt"`
+		A0                  float64                     `json:"a0"`
+		Rho                 float64                     `json:"rho"`
+		Tau                 float64                     `json:"tau"`
+		CollateralPercent   uint64                      `json:"collateral_percent"`
+		PriceMem            float64                     `json:"price_mem"`
+		PriceStep           float64                     `json:"price_step"`
+		CoinsPerUtxoWord    string                      `json:"coins_per_utxo_word"`
+		MaxTxExMem          string                      `json:"max_tx_ex_mem"`
+		MaxTxExSteps        string                      `json:"max_tx_ex_steps"`
+		MaxBlockExMem       string                      `json:"max_block_ex_mem"`
+		MaxBlockExSteps     string                      `json:"max_block_ex_steps"`
+		MaxCollateralInputs uint64                      `json:"max_collateral_inputs"`
+		MaxValSize          string                      `json:"max_val_size"`
+		CostModels          map[string]map[string]int64 `json:"cost_models"`
+	}
 
-	if err := json.Unmarshal(bytes, &jsonMap); err != nil {
+	if err := json.Unmarshal(bytes, &bfpp); err != nil {
 		return nil, err
 	}
 
 	strToUInt64 := func(s string) uint64 {
-		v, _ := strconv.ParseUint(s, 10, 64)
+		v, _ := strconv.ParseUint(s, 0, 64)
 
 		return v
 	}
 
-	//nolint:forcetypeassert
-	resultJSON := map[string]interface{}{
-		"extraPraosEntropy": nil,
-		"decentralization":  nil,
-		"protocolVersion": map[string]interface{}{
-			"major": jsonMap["protocol_major_ver"],
-			"minor": jsonMap["protocol_minor_ver"],
-		},
-		"maxBlockHeaderSize":   jsonMap["max_block_header_size"],
-		"maxBlockBodySize":     jsonMap["max_block_size"],
-		"maxTxSize":            jsonMap["max_tx_size"],
-		"txFeeFixed":           jsonMap["min_fee_b"],
-		"txFeePerByte":         jsonMap["min_fee_a"],
-		"stakeAddressDeposit":  strToUInt64(jsonMap["key_deposit"].(string)),
-		"stakePoolDeposit":     strToUInt64(jsonMap["pool_deposit"].(string)),
-		"minPoolCost":          strToUInt64(jsonMap["min_pool_cost"].(string)),
-		"poolRetireMaxEpoch":   jsonMap["e_max"],
-		"stakePoolTargetNum":   jsonMap["n_opt"],
-		"poolPledgeInfluence":  jsonMap["a0"],
-		"monetaryExpansion":    jsonMap["rho"],
-		"treasuryCut":          jsonMap["tau"],
-		"collateralPercentage": jsonMap["collateral_percent"],
-		"executionUnitPrices": map[string]interface{}{
-			"priceMemory": jsonMap["price_mem"],
-			"priceSteps":  jsonMap["price_step"],
-		},
-		"utxoCostPerByte": strToUInt64(jsonMap["coins_per_utxo_word"].(string)), // coins_per_utxo_size ?
-		"minUTxOValue":    nil,                                                  // min_utxo? this was nil with cardano-cli
-		"maxTxExecutionUnits": map[string]interface{}{
-			"memory": strToUInt64(jsonMap["max_tx_ex_mem"].(string)),
-			"steps":  strToUInt64(jsonMap["max_tx_ex_steps"].(string)),
-		},
-		"maxBlockExecutionUnits": map[string]interface{}{
-			"memory": strToUInt64(jsonMap["max_block_ex_mem"].(string)),
-			"steps":  strToUInt64(jsonMap["max_block_ex_steps"].(string)),
-		},
-		"maxCollateralInputs": jsonMap["max_collateral_inputs"],
-		"maxValueSize":        strToUInt64(jsonMap["max_val_size"].(string)),
+	pp := ProtocolParameters{
+		ProtocolVersion: NewProtocolParametersVersion(
+			bfpp.ProtocolMajorVer, bfpp.ProtocolMinorVer),
+		MaxBlockHeaderSize:   bfpp.MaxBlockHeaderSize,
+		MaxBlockBodySize:     bfpp.MaxBlockSize,
+		MaxTxSize:            bfpp.MaxTxSize,
+		TxFeeFixed:           bfpp.MinFeeB,
+		TxFeePerByte:         bfpp.MinFeeA,
+		StakeAddressDeposit:  strToUInt64(bfpp.KeyDeposit),
+		StakePoolDeposit:     strToUInt64(bfpp.PoolDeposit),
+		MinPoolCost:          strToUInt64(bfpp.MinPoolCost),
+		PoolRetireMaxEpoch:   bfpp.EMax,
+		StakePoolTargetNum:   bfpp.NOpt,
+		PoolPledgeInfluence:  bfpp.A0,
+		MonetaryExpansion:    bfpp.Rho,
+		TreasuryCut:          bfpp.Tau,
+		CollateralPercentage: bfpp.CollateralPercent,
+		ExecutionUnitPrices: NewProtocolParametersPriceMemorySteps(
+			bfpp.PriceMem, bfpp.PriceStep),
+		UtxoCostPerByte: strToUInt64(bfpp.CoinsPerUtxoWord),
+		MaxTxExecutionUnits: NewProtocolParametersMemorySteps(
+			strToUInt64(bfpp.MaxTxExMem), strToUInt64(bfpp.MaxTxExSteps)),
+		MaxBlockExecutionUnits: NewProtocolParametersMemorySteps(
+			strToUInt64(bfpp.MaxBlockExMem), strToUInt64(bfpp.MaxBlockExSteps)),
+		MaxCollateralInputs: bfpp.MaxCollateralInputs,
+		MaxValueSize:        strToUInt64(bfpp.MaxValSize),
+		CostModels:          map[string][]int64{},
 	}
 
-	//nolint
-	// TODO: "costModels": "PlutusV1" ...
+	for scriptName, mapValue := range bfpp.CostModels {
+		ints := make([]int64, len(mapValue))
 
-	return json.Marshal(resultJSON)
+		for k, v := range mapValue {
+			if val, err := strconv.Atoi(k); err == nil {
+				ints[val] = v
+			}
+		}
+
+		pp.CostModels[scriptName] = ints
+	}
+
+	return json.Marshal(pp)
 }
 
 func getErrorFromResponse(resp *http.Response) error {

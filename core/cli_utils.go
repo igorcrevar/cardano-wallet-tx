@@ -11,10 +11,6 @@ import (
 	"github.com/igorcrevar/go-cardano-tx/core/bech32"
 )
 
-var (
-	ErrInvalidAddressInfo = errors.New("invalid address info")
-)
-
 type AddressInfo struct {
 	Address  string `json:"address"`
 	Base16   string `json:"base16"`
@@ -118,11 +114,11 @@ func (cu CliUtils) GetAddressInfo(address string) (AddressInfo, error) {
 		"address", "info", "--address", address,
 	})
 	if err != nil {
-		return ai, errors.Join(ErrInvalidAddressInfo, err)
+		return ai, errors.Join(ErrInvalidAddressData, err)
 	}
 
 	if err := json.Unmarshal([]byte(strings.Trim(res, "\n")), &ai); err != nil {
-		return ai, errors.Join(ErrInvalidAddressInfo, err)
+		return ai, errors.Join(ErrInvalidAddressData, err)
 	}
 
 	return ai, nil

@@ -41,54 +41,56 @@ func (o *TxProviderOgmios) GetProtocolParameters(ctx context.Context) ([]byte, e
 	}
 
 	asFloat := func(s string) float64 {
+		parts := strings.Split(s, "/")
+		if len(parts) == 2 {
+			v1, _ := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+			v2, _ := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+
+			return v1 / v2
+		}
+
 		v, _ := strconv.ParseFloat(strings.TrimSpace(s), 64)
 
 		return v
 	}
 
-	resultJSON := map[string]interface{}{
-		"extraPraosEntropy": nil,
-		"decentralization":  nil,
-		"protocolVersion": map[string]interface{}{
-			"major": params.Result.Version.Major,
-			"minor": params.Result.Version.Minor,
-		},
-		"maxBlockHeaderSize":   params.Result.MaxBlockHeaderSize.Bytes,
-		"maxBlockBodySize":     params.Result.MaxBlockBodySize.Bytes,
-		"maxTxSize":            params.Result.MaxTransactionSize.Bytes,
-		"txFeeFixed":           params.Result.MinFeeConstant.Ada.Lovelace,
-		"txFeePerByte":         params.Result.MinFeeCoefficient,
-		"stakeAddressDeposit":  params.Result.StakeCredentialDeposit.Ada.Lovelace,
-		"stakePoolDeposit":     params.Result.StakePoolDeposit.Ada.Lovelace,
-		"minPoolCost":          params.Result.MinStakePoolCost.Ada.Lovelace,
-		"poolRetireMaxEpoch":   params.Result.StakePoolRetirementEpochBound,
-		"stakePoolTargetNum":   params.Result.DesiredNumberOfStakePools,
-		"poolPledgeInfluence":  asFloat(params.Result.StakePoolPledgeInfluence),
-		"monetaryExpansion":    asFloat(params.Result.MonetaryExpansion),
-		"treasuryCut":          asFloat(params.Result.TreasuryExpansion),
-		"collateralPercentage": params.Result.CollateralPercentage,
-		"executionUnitPrices": map[string]interface{}{
-			"priceMemory": asFloat(params.Result.ScriptExecutionPrices.Memory),
-			"priceSteps":  asFloat(params.Result.ScriptExecutionPrices.CPU),
-		},
-		"utxoCostPerByte": params.Result.MinUtxoDepositCoefficient, // coins_per_utxo_size ?
-		"minUTxOValue":    nil,                                     // min_utxo? this was nil with cardano-cli
-		"maxTxExecutionUnits": map[string]interface{}{
-			"memory": params.Result.MaxExecutionUnitsPerTransaction.Memory,
-			"steps":  params.Result.MaxExecutionUnitsPerTransaction.CPU,
-		},
-		"maxBlockExecutionUnits": map[string]interface{}{
-			"memory": params.Result.MaxExecutionUnitsPerBlock.Memory,
-			"steps":  params.Result.MaxExecutionUnitsPerBlock.CPU,
-		},
-		"maxCollateralInputs": params.Result.MaxCollateralInputs,
-		"maxValueSize":        params.Result.MaxValueSize.Bytes,
+	pp := ProtocolParameters{
+		ProtocolVersion:      NewProtocolParametersVersion(params.Result.Version.Major, params.Result.Version.Minor),
+		MaxBlockHeaderSize:   params.Result.MaxBlockHeaderSize.Bytes,
+		MaxBlockBodySize:     params.Result.MaxBlockBodySize.Bytes,
+		MaxTxSize:            params.Result.MaxTransactionSize.Bytes,
+		TxFeeFixed:           params.Result.MinFeeConstant.Ada.Lovelace,
+		TxFeePerByte:         params.Result.MinFeeCoefficient,
+		StakeAddressDeposit:  params.Result.StakeCredentialDeposit.Ada.Lovelace,
+		StakePoolDeposit:     params.Result.StakePoolDeposit.Ada.Lovelace,
+		MinPoolCost:          params.Result.MinStakePoolCost.Ada.Lovelace,
+		PoolRetireMaxEpoch:   params.Result.StakePoolRetirementEpochBound,
+		StakePoolTargetNum:   params.Result.DesiredNumberOfStakePools,
+		PoolPledgeInfluence:  asFloat(params.Result.StakePoolPledgeInfluence),
+		MonetaryExpansion:    asFloat(params.Result.MonetaryExpansion),
+		TreasuryCut:          asFloat(params.Result.TreasuryExpansion),
+		CollateralPercentage: params.Result.CollateralPercentage,
+		ExecutionUnitPrices: NewProtocolParametersPriceMemorySteps(
+			asFloat(params.Result.ScriptExecutionPrices.Memory), asFloat(params.Result.ScriptExecutionPrices.CPU)),
+		UtxoCostPerByte: params.Result.MinUtxoDepositCoefficient, // coins_per_utxo_size ?
+		MaxTxExecutionUnits: NewProtocolParametersMemorySteps(
+			params.Result.MaxExecutionUnitsPerTransaction.Memory,
+			params.Result.MaxExecutionUnitsPerTransaction.CPU),
+		MaxBlockExecutionUnits: NewProtocolParametersMemorySteps(
+			params.Result.MaxExecutionUnitsPerBlock.Memory,
+			params.Result.MaxExecutionUnitsPerBlock.CPU),
+		MaxCollateralInputs: params.Result.MaxCollateralInputs,
+		MaxValueSize:        params.Result.MaxValueSize.Bytes,
+		CostModels:          map[string][]int64{},
 	}
 
-	//nolint
-	// TODO: "costModels": "PlutusV1" ...
+	for scriptName, values := range params.Result.PlutusCostModels {
+		if parts := strings.Split(scriptName, ":"); len(parts) == 2 && len(parts[1]) > 0 {
+			pp.CostModels["PlutusV"+parts[1][1:]] = values
+		}
+	}
 
-	return json.Marshal(resultJSON)
+	return json.Marshal(pp)
 }
 
 // GetSlot implements ITxProvider.

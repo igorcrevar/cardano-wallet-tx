@@ -35,20 +35,20 @@ type ogmiosQueryProtocolParamsResponse struct {
 	Jsonrpc string `json:"jsonrpc"`
 	Method  string `json:"method"`
 	Result  struct {
-		MinFeeCoefficient uint `json:"minFeeCoefficient"`
+		MinFeeCoefficient uint64 `json:"minFeeCoefficient"`
 		MinFeeConstant    struct {
 			Ada struct {
 				Lovelace uint64 `json:"lovelace"`
 			} `json:"ada"`
 		} `json:"minFeeConstant"`
 		MaxBlockBodySize struct {
-			Bytes uint `json:"bytes"`
+			Bytes uint64 `json:"bytes"`
 		} `json:"maxBlockBodySize"`
 		MaxBlockHeaderSize struct {
-			Bytes uint `json:"bytes"`
+			Bytes uint64 `json:"bytes"`
 		} `json:"maxBlockHeaderSize"`
 		MaxTransactionSize struct {
-			Bytes uint `json:"bytes"`
+			Bytes uint64 `json:"bytes"`
 		} `json:"maxTransactionSize"`
 		StakeCredentialDeposit struct {
 			Ada struct {
@@ -60,8 +60,8 @@ type ogmiosQueryProtocolParamsResponse struct {
 				Lovelace uint64 `json:"lovelace"`
 			} `json:"ada"`
 		} `json:"stakePoolDeposit"`
-		StakePoolRetirementEpochBound uint   `json:"stakePoolRetirementEpochBound"`
-		DesiredNumberOfStakePools     uint   `json:"desiredNumberOfStakePools"`
+		StakePoolRetirementEpochBound uint64 `json:"stakePoolRetirementEpochBound"`
+		DesiredNumberOfStakePools     uint64 `json:"desiredNumberOfStakePools"`
 		StakePoolPledgeInfluence      string `json:"stakePoolPledgeInfluence"`
 		MonetaryExpansion             string `json:"monetaryExpansion"`
 		TreasuryExpansion             string `json:"treasuryExpansion"`
@@ -75,28 +75,28 @@ type ogmiosQueryProtocolParamsResponse struct {
 				Lovelace uint64 `json:"lovelace"`
 			} `json:"ada"`
 		} `json:"minUtxoDepositConstant"`
-		MinUtxoDepositCoefficient uint              `json:"minUtxoDepositCoefficient"`
-		PlutusCostModels          map[string][]uint `json:"plutusCostModels"`
+		MinUtxoDepositCoefficient uint64             `json:"minUtxoDepositCoefficient"`
+		PlutusCostModels          map[string][]int64 `json:"plutusCostModels"`
 		ScriptExecutionPrices     struct {
 			Memory string `json:"memory"`
 			CPU    string `json:"cpu"`
 		} `json:"scriptExecutionPrices"`
 		MaxExecutionUnitsPerTransaction struct {
-			Memory uint `json:"memory"`
-			CPU    uint `json:"cpu"`
+			Memory uint64 `json:"memory"`
+			CPU    uint64 `json:"cpu"`
 		} `json:"maxExecutionUnitsPerTransaction"`
 		MaxExecutionUnitsPerBlock struct {
-			Memory uint `json:"memory"`
-			CPU    uint `json:"cpu"`
+			Memory uint64 `json:"memory"`
+			CPU    uint64 `json:"cpu"`
 		} `json:"maxExecutionUnitsPerBlock"`
 		MaxValueSize struct {
-			Bytes uint `json:"bytes"`
+			Bytes uint64 `json:"bytes"`
 		} `json:"maxValueSize"`
-		CollateralPercentage uint `json:"collateralPercentage"`
-		MaxCollateralInputs  uint `json:"maxCollateralInputs"`
+		CollateralPercentage uint64 `json:"collateralPercentage"`
+		MaxCollateralInputs  uint64 `json:"maxCollateralInputs"`
 		Version              struct {
-			Major uint `json:"major"`
-			Minor uint `json:"minor"`
+			Major uint64 `json:"major"`
+			Minor uint64 `json:"minor"`
 		} `json:"version"`
 	} `json:"result"`
 	ID interface{} `json:"id"`
