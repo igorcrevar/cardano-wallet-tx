@@ -112,15 +112,28 @@ func TestNewAddress(t *testing.T) {
 }
 
 func TestByronAddress(t *testing.T) {
-	// currently not supported
 	addrs := []string{
 		"Ae2tdPwUPEYwFx4dmJheyNPPYXtvHbJLeCaA96o6Y2iiUL18cAt7AizN2zG",
+		"Ae2tdPwUPEZFRbyhz3cpfC2CumGzNkFBN2L42rcUc2yjQpEkxDbkPodpMAi",
 		"37btjrVyb4KDXBNC4haBVPCrro8AQPHwvCMp3RFhhSVWwfFmZ6wwzSK6JK1hY6wHNmtrpTf1kdbva8TCneM2YsiXT7mrzT21EacHnPpz5YyUdj64na",
+		"37btjrVyb4KEB2STADSsj3MYSAdj52X5FrFWpw2r7Wmj2GDzXjFRsHWuZqrw7zSkwopv8Ci3VWeg6bisU9dgJxW5hb2MZYeduNKbQJrqz3zVBsu9nT",
 	}
 
-	for _, x := range addrs {
-		_, err := NewCardanoAddressFromString(x)
+	for i, addrStr := range addrs {
+		addr, err := NewCardanoAddressFromString(addrStr)
+		require.NoError(t, err)
 
-		require.Error(t, err, ErrUnsupportedAddress)
+		newAddr, err := addr.GetInfo().ToCardanoAddress()
+		require.NoError(t, err)
+
+		require.Equal(t, addr.String(), newAddr.String())
+		require.Equal(t, addrStr, newAddr.String())
+		require.Equal(t, ByronAddress, addr.GetInfo().AddressType)
+
+		if i < 2 {
+			require.Equal(t, MainNetNetwork, addr.GetInfo().Network)
+		} else {
+			require.Equal(t, TestNetNetwork, addr.GetInfo().Network)
+		}
 	}
 }

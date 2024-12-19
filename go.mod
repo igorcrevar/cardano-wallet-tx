@@ -2,7 +2,10 @@ module github.com/igorcrevar/go-cardano-tx
 
 go 1.21
 
-require github.com/fxamacker/cbor/v2 v2.6.0
+require (
+	github.com/akamensky/base58 v0.0.0-20210829145138-ce8bf8802e8f
+	github.com/fxamacker/cbor/v2 v2.6.0
+)
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect

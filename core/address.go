@@ -3,11 +3,11 @@ package core
 import (
 	"errors"
 
+	"github.com/akamensky/base58"
 	"github.com/igorcrevar/go-cardano-tx/core/bech32"
 )
 
 var (
-	ErrUnsupportedAddress = errors.New("invalid/unsupported address type")
 	ErrInvalidAddressData = errors.New("invalid address data")
 )
 
@@ -15,6 +15,7 @@ type CardanoAddressType byte
 
 const (
 	UnsupportedAddress CardanoAddressType = 0
+	ByronAddress       CardanoAddressType = 0b1000
 	BaseAddress        CardanoAddressType = 1 // 0b0000, 0b0001, 0b0010, 0b0011
 	PointerAddress     CardanoAddressType = 2 // 0b0100, 0b0101
 	EnterpriseAddress  CardanoAddressType = 3 // 0b0110, 0b0111
@@ -23,6 +24,8 @@ const (
 
 func GetAddressTypeFromHeader(header byte) CardanoAddressType {
 	switch (header & 0xF0) >> 4 {
+	case byte(ByronAddress):
+		return ByronAddress
 	case 0b0000, 0b0001, 0b0010, 0b0011:
 		return BaseAddress
 	case 0b0100, 0b0101:
@@ -66,7 +69,14 @@ func NewCardanoAddress(raw []byte) (*CardanoAddress, error) {
 
 func NewCardanoAddressFromString(raw string) (*CardanoAddress, error) {
 	if !IsAddressWithValidPrefix(raw) {
-		return nil, ErrUnsupportedAddress // byron not supported data = base58.Decode(raw)
+		data, err := base58.Decode(raw)
+		if err != nil {
+			return nil, errors.Join(ErrInvalidAddressData, err)
+		} else if len(data) == 0 || GetAddressTypeFromHeader(data[0]) != ByronAddress {
+			return nil, ErrInvalidAddressData
+		}
+
+		return NewCardanoAddress(data)
 	}
 
 	_, data, err := bech32.DecodeToBase256(raw)

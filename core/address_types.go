@@ -1,9 +1,14 @@
 package core
 
 import (
+	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"hash/crc32"
 
+	"github.com/akamensky/base58"
+	"github.com/fxamacker/cbor/v2"
 	"github.com/igorcrevar/go-cardano-tx/core/bech32"
 )
 
@@ -35,6 +40,7 @@ var addressParsers = []cardanoAddressParser{
 	&cardanoPointerAddressParser{},
 	&cardanoEnterpriseAddressParser{},
 	&cardanoRewardAddressParser{},
+	&cardanoByronAddressParser{},
 }
 
 // cardanoBaseAddressParser BaseAddress
@@ -295,6 +301,89 @@ func (addrParser cardanoRewardAddressParser) FromCardanoAddressInfo(a CardanoAdd
 	return bytes
 }
 
+// cardanoByronAddressParser ByronAddress
+// 1000: NOT IMPLEMENTED
+type cardanoByronAddressParser struct{}
+
+func (addrParser cardanoByronAddressParser) GetAddressType() CardanoAddressType {
+	return ByronAddress
+}
+
+func (addrParser cardanoByronAddressParser) IsValid(bytes []byte) error {
+	var rawAddr struct {
+		_        struct{} `cbor:",toarray"`
+		Tag      cbor.Tag
+		Checksum uint32
+	}
+
+	if err := cbor.Unmarshal(bytes, &rawAddr); err != nil {
+		return errors.Join(ErrInvalidAddressData, err)
+	}
+
+	rawTag, ok := rawAddr.Tag.Content.([]byte)
+	if !ok || rawAddr.Tag.Number != 24 {
+		return ErrInvalidAddressData
+	}
+
+	cheksum := crc32.ChecksumIEEE(rawTag)
+	if rawAddr.Checksum != cheksum {
+		return ErrInvalidAddressData
+	}
+
+	return nil
+}
+
+func (addrParser cardanoByronAddressParser) ToString(bytes []byte) string {
+	return base58.Encode(bytes)
+}
+
+func (addrParser cardanoByronAddressParser) ToCardanoAddressInfo(bytes []byte) CardanoAddressInfo {
+	var rawAddr struct {
+		_        struct{} `cbor:",toarray"`
+		Tag      cbor.Tag
+		Checksum uint32
+	}
+
+	_ = cbor.Unmarshal(bytes, &rawAddr)
+	rawTag, _ := rawAddr.Tag.Content.([]byte)
+
+	var byron struct {
+		_      struct{} `cbor:",toarray"`
+		Hashed []byte
+		Attrs  struct {
+			Payload []byte `cbor:"1,keyasint,omitempty"`
+			Network []byte `cbor:"2,keyasint,omitempty"`
+		}
+		Tag uint
+	}
+
+	if err := cbor.Unmarshal(rawTag, &byron); err != nil {
+		return CardanoAddressInfo{
+			AddressType: UnsupportedAddress,
+		}
+	}
+
+	network := MainNetNetwork
+	if len(byron.Attrs.Network) == 1 && byron.Attrs.Network[0] == 1 ||
+		len(byron.Attrs.Network) == 5 && binary.BigEndian.Uint32(byron.Attrs.Network[1:]) == uint32(TestNetProtocolMagic) {
+		network = TestNetNetwork
+	}
+
+	return CardanoAddressInfo{
+		AddressType: ByronAddress,
+		Network:     network,
+		Payment: &CardanoAddressPayload{
+			Payload:  [28]byte(byron.Hashed),
+			IsScript: false,
+		},
+		Extra: bytes,
+	}
+}
+
+func (addrParser cardanoByronAddressParser) FromCardanoAddressInfo(a CardanoAddressInfo) []byte {
+	return a.Extra
+}
+
 func toByte(b bool) byte {
 	if !b {
 		return 0
@@ -310,5 +399,5 @@ func getAddressParser(addressType CardanoAddressType) (cardanoAddressParser, err
 		}
 	}
 
-	return nil, ErrUnsupportedAddress
+	return nil, ErrInvalidAddressData
 }
